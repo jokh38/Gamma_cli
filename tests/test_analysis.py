@@ -1,3 +1,6 @@
+"""
+This module contains unit tests for the analysis functions.
+"""
 import unittest
 import os
 import sys

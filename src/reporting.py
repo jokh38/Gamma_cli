@@ -1,3 +1,6 @@
+"""
+This module provides functions for generating reports of the gamma analysis results.
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle

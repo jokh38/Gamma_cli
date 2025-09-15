@@ -1,3 +1,6 @@
+"""
+This module provides classes for handling DICOM and MCC files.
+"""
 import os
 import numpy as np
 import pydicom
@@ -5,7 +8,7 @@ from scipy.interpolate import griddata
 from utils import logger
 
 class BaseFileHandler:
-    """다양한 파일 핸들러를 위한 기본 클래스"""
+    """Base class for various file handlers."""
     def __init__(self):
         self.filename = None
         self.pixel_data = None
@@ -19,38 +22,38 @@ class BaseFileHandler:
         self.crop_pixel_offset = (0, 0)
         
     def get_filename(self):
-        """파일명 반환"""
+        """Returns the filename."""
         if self.filename:
             return os.path.basename(self.filename)
         return None
     
     def get_physical_extent(self):
-        """물리적 좌표 범위 반환"""
+        """Returns the physical coordinate range."""
         return self.physical_extent
     
     def get_origin_coords(self):
-        """원점 좌표 반환"""
+        """Returns the origin coordinates."""
         return self.origin_x, self.origin_y
         
     def get_spacing(self):
-        """픽셀 간격 반환"""
+        """Returns the pixel spacing."""
         return self.pixel_spacing, self.pixel_spacing
     
     def get_pixel_data(self):
-        """픽셀 데이터 반환"""
+        """Returns the pixel data."""
         return self.pixel_data
     
     def create_physical_coordinates(self):
-        """물리적 좌표계 생성 (추상 메서드)"""
-        raise NotImplementedError("서브클래스에서 구현해야 함")
+        """Creates the physical coordinate system (abstract method)."""
+        raise NotImplementedError("Must be implemented in subclass")
     
     def physical_to_pixel_coord(self, phys_x, phys_y):
-        """물리적 좌표(mm)를 픽셀 좌표로 변환 (추상 메서드)"""
-        raise NotImplementedError("서브클래스에서 구현해야 함")
+        """Converts physical coordinates (mm) to pixel coordinates (abstract method)."""
+        raise NotImplementedError("Must be implemented in subclass")
     
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
-        """픽셀 좌표를 물리적 좌표(mm)로 변환 (추상 메서드)"""
-        raise NotImplementedError("서브클래스에서 구현해야 함")
+        """Converts pixel coordinates to physical coordinates (mm) (abstract method)."""
+        raise NotImplementedError("Must be implemented in subclass")
 
     def _calculate_bounds_from_mask(self, mask, margin_mm=0):
         if not np.any(mask):
@@ -86,19 +89,19 @@ class BaseFileHandler:
         return bounds
         
     def open_file(self, filename):
-        """파일 로드 (추상 메서드)"""
+        """Loads a file (abstract method)."""
         try:
             self.filename = filename
-            # 파일 로드 로직 (서브클래스에서 구현)
+            # File loading logic (to be implemented in subclasses)
             return True
         except Exception as e:
-            error_msg = f"파일 로드 오류: {str(e)}"
+            error_msg = f"File loading error: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
 
 
 class DicomFileHandler(BaseFileHandler):
-    """DICOM RT dose 파일을 처리하는 클래스"""
+    """Class for handling DICOM RT dose files."""
     def __init__(self):
         super().__init__()
         self.dicom_data = None
@@ -107,7 +110,7 @@ class DicomFileHandler(BaseFileHandler):
         self.pixel_spacing = 1.0
         
     def open_file(self, filename):
-        """DICOM RT dose 파일 로드"""
+        """Loads a DICOM RT dose file."""
         try:
             self.filename = filename
             self.dicom_data = pydicom.dcmread(filename)
@@ -174,7 +177,7 @@ class DicomFileHandler(BaseFileHandler):
             return False, error_msg
 
     def calculate_dose_bounds(self, dicom_image=None, threshold_percent=0, margin_mm=0):
-        """선량 임계값 또는 0이 아닌 선량 영역에 대한 경계를 계산합니다."""
+        """Calculates the bounds for a dose area based on a threshold or non-zero dose."""
         if dicom_image is None:
             dicom_image = self.get_pixel_data()
         if dicom_image is None:
@@ -221,7 +224,7 @@ class DicomFileHandler(BaseFileHandler):
         return self.pixel_spacing, self.pixel_spacing
 
     def get_patient_info(self):
-        """환자 정보(기관명, ID, 이름) 반환"""
+        """Returns patient information (institution name, ID, name)."""
         if self.dicom_data is None:
             return None, None, None
 
@@ -232,7 +235,7 @@ class DicomFileHandler(BaseFileHandler):
         return institution, patient_id, patient_name
 
 class MCCFileHandler(BaseFileHandler):
-    """MCC 파일을 처리하는 클래스"""
+    """Class for handling MCC files."""
     def __init__(self):
         super().__init__()
         self.matrix_data = None
@@ -287,7 +290,9 @@ class MCCFileHandler(BaseFileHandler):
             return False, error_msg
 
     def crop_to_bounds(self, bounds):
-        """Crops the MCC data based on physical coordinate bounds from DICOM."""
+        """
+        Crops the MCC data based on physical coordinate bounds from DICOM.
+        """
         if self.matrix_data is None or bounds is None:
             return
 
@@ -318,7 +323,7 @@ class MCCFileHandler(BaseFileHandler):
         logger.info(f"MCC data has been cropped to DICOM ROI. New shape: {self.matrix_data.shape}")
 
     def calculate_dose_bounds(self, mcc_image=None, threshold_percent=0, margin_mm=0):
-        """선량 임계값 또는 0이 아닌 선량 영역에 대한 경계를 계산합니다."""
+        """Calculates the bounds for a dose area based on a threshold or non-zero dose."""
         if mcc_image is None:
             mcc_image = self.get_pixel_data()
         if mcc_image is None:

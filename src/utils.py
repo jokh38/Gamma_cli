@@ -1,9 +1,12 @@
+"""
+This module provides utility functions for the application, including logging and array manipulation.
+"""
 import os
 import logging
 import numpy as np
 from datetime import datetime
 
-# 로그 디렉토리 확인 및 생성
+# Check and create log directory
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
@@ -13,13 +16,13 @@ log_file = os.path.join(log_dir, f'gamma_analysis_{datetime.now().strftime("%Y%m
 
 # 로거 설정
 def setup_logger(name):
-    """애플리케이션용 로거 설정
+    """Sets up a logger for the application.
 
     Args:
-        name (str): 로거 이름
+        name (str): The name of the logger.
 
     Returns:
-        logging.Logger: 설정된 로거 객체
+        logging.Logger: The configured logger object.
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -45,13 +48,13 @@ def setup_logger(name):
 logger = setup_logger('gamma_analysis')
 
 def find_nearest_index(array, value):
-    """배열에서 주어진 값과 가장 가까운 요소의 인덱스 반환
+    """Returns the index of the element in the array that is closest to the given value.
 
     Args:
-        array (numpy.ndarray): 탐색할 배열
-        value (float): 찾을 값
+        array (numpy.ndarray): The array to search.
+        value (float): The value to find.
 
     Returns:
-        int: 가장 가까운 값의 인덱스
+        int: The index of the nearest value.
     """
     return np.argmin(np.abs(array - value))
