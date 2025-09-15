@@ -350,7 +350,7 @@ class MCCFileHandler(BaseFileHandler):
             self.mcc_spacing_y = 10.0
     
     def extract_data(self, lines, N_begin, device_type, task_type):
-        # ... (이전과 동일한 데이터 추출 로직)
+        
         try:
             if task_type == 1: oct_read_intv = 3
             else: oct_read_intv = 2
