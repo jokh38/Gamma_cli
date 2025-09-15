@@ -131,7 +131,7 @@ class DicomFileHandler(BaseFileHandler):
                 logger.warning(f"DICOM 원점 정보 없음. 이미지 중심으로 기본값 설정: ({self.dicom_origin_x}, {self.dicom_origin_y})")
                 
             self.create_physical_coordinates()
-            self.dose_bounds = self.calculate_dose_bounds() # 자동 크롭 기능 활성화
+            self.dose_bounds = self.calculate_dose_bounds(margin_mm=10) # 자동 크롭 기능 활성화
 
             if self.dose_bounds:
                 x_coords, y_coords = self.phys_x_mesh, self.phys_y_mesh
@@ -199,6 +199,35 @@ class DicomFileHandler(BaseFileHandler):
 
         return institution, patient_id, patient_name
 
+    def get_cropped_data(self, bounds):
+        """Crops the data to the given physical bounds."""
+        if self.pixel_data is None or bounds is None:
+            return None, None
+
+        # Ensure the correct order for min/max y for cropping
+        min_phys_y, max_phys_y = sorted([bounds['min_y'], bounds['max_y']])
+
+        min_px, min_py = self.physical_to_pixel_coord(bounds['min_x'], min_phys_y)
+        max_px, max_py = self.physical_to_pixel_coord(bounds['max_x'], max_phys_y)
+
+        # Swap if coordinates are descending
+        if min_py > max_py:
+            min_py, max_py = max_py, min_py
+        if min_px > max_px:
+            min_px, max_px = max_px, min_px
+
+        # Ensure indices are within array bounds
+        min_py = max(0, min_py)
+        min_px = max(0, min_px)
+        max_py = min(self.pixel_data.shape[0], max_py)
+        max_px = min(self.pixel_data.shape[1], max_px)
+
+        cropped_data = self.pixel_data[min_py:max_py, min_px:max_px]
+
+        cropped_extent = [bounds['min_x'], bounds['max_x'], bounds['min_y'], bounds['max_y']]
+
+        return cropped_data, cropped_extent
+
 class MCCFileHandler(BaseFileHandler):
     """MCC 파일을 처리하는 클래스"""
     def __init__(self):
@@ -245,7 +274,7 @@ class MCCFileHandler(BaseFileHandler):
             
             self._set_device_parameters()
             self.create_physical_coordinates()
-            self.dose_bounds = self.calculate_dose_bounds()
+            self.dose_bounds = self.calculate_dose_bounds(margin_mm=10)
 
             if self.dose_bounds:
                 x_coords, y_coords = self.phys_x_mesh, self.phys_y_mesh
@@ -351,3 +380,37 @@ class MCCFileHandler(BaseFileHandler):
         phys_x = (pixel_x - self.mcc_origin_x) * self.mcc_spacing_x
         phys_y = -(pixel_y - self.mcc_origin_y) * self.mcc_spacing_y
         return phys_x, phys_y
+
+    def crop_array_by_bounds(self, data_array, bounds):
+        """Crops a data array to the given physical bounds."""
+        if data_array is None or bounds is None:
+            return None, None
+
+        # The y-axis is inverted in MCC, so we need to handle bounds carefully
+        min_phys_y, max_phys_y = sorted([bounds['min_y'], bounds['max_y']])
+
+        min_px, min_py = self.physical_to_pixel_coord(bounds['min_x'], min_phys_y)
+        max_px, max_py = self.physical_to_pixel_coord(bounds['max_x'], max_phys_y)
+
+        # Swap if coordinates are descending
+        if min_py > max_py:
+            min_py, max_py = max_py, min_py
+        if min_px > max_px:
+            min_px, max_px = max_px, min_px
+
+        # Ensure indices are within array bounds
+        min_py = max(0, min_py)
+        min_px = max(0, min_px)
+        max_py = min(data_array.shape[0], max_py)
+        max_px = min(data_array.shape[1], max_px)
+
+        cropped_data = data_array[min_py:max_py, min_px:max_px]
+
+        # Extent should still be based on the original bounds, but y is flipped for MCC imshow
+        cropped_extent = [bounds['min_x'], bounds['max_x'], bounds['max_y'], bounds['min_y']]
+
+        return cropped_data, cropped_extent
+
+    def get_cropped_data(self, bounds):
+        """Crops the data to the given physical bounds."""
+        return self.crop_array_by_bounds(self.pixel_data, bounds)

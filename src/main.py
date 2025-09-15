@@ -49,7 +49,7 @@ def main():
 
     # Perform gamma analysis
     try:
-        gamma_map, gamma_stats, phys_extent = perform_gamma_analysis(
+        gamma_map, gamma_stats, phys_extent, mcc_interp_data = perform_gamma_analysis(
             mcc_handler, dicom_handler,
             dd, dta,
             global_normalisation=True  # Assuming global gamma, can be made configurable
@@ -92,7 +92,9 @@ def main():
                 dd,
                 suppression_level,
                 ver_profile_data,
-                hor_profile_data
+                hor_profile_data,
+                bounds=dicom_handler.dose_bounds,
+                mcc_interp_data=mcc_interp_data
             )
             logger.info(f"Report saved to {output_filename}")
 
