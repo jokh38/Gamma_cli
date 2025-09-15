@@ -9,6 +9,7 @@ A command-line tool for performing 2D Gamma Analysis on DICOM RT dose files and 
 - matplotlib
 - pydicom
 - pymedphys
+- pyyaml
 - pylinac
 
 You can install the dependencies using pip:
@@ -26,14 +27,12 @@ pip install -r requirements.txt
 
 ## Configuration
 
-The analysis parameters are configured through a `config.json` file in the root directory.
+The analysis parameters are configured through a `config.yaml` file in the root directory.
 
-```json
-{
-  "dta": 3,
-  "dd": 3,
-  "suppression_level": 10
-}
+```yaml
+dta: 3
+dd: 3
+suppression_level: 10
 ```
 
 - `dta`: Distance-to-agreement in millimeters (e.g., 3).

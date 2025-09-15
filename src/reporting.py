@@ -13,7 +13,6 @@ def generate_report(
     suppression_level,
     ver_profile_data,
     hor_profile_data,
-    bounds=None,
     mcc_interp_data=None
 ):
     """Generates a report with all the analysis information."""
@@ -27,9 +26,10 @@ def generate_report(
     # 1. 2D Dose Plots
     # DICOM Dose
     ax_dicom = fig.add_subplot(gs[0, 0])
-    dicom_crop_data, dicom_crop_extent = dicom_handler.get_cropped_data(bounds)
-    if dicom_crop_data is not None:
-        im_dicom = ax_dicom.imshow(dicom_crop_data, cmap='jet', extent=dicom_crop_extent, aspect='equal')
+    dicom_data = dicom_handler.get_pixel_data()
+    dicom_extent = dicom_handler.get_physical_extent()
+    if dicom_data is not None and dicom_extent is not None:
+        im_dicom = ax_dicom.imshow(dicom_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='lower')
         fig.colorbar(im_dicom, ax=ax_dicom, label='Dose (Gy)')
     ax_dicom.set_title('DICOM RT Dose')
     ax_dicom.set_xlabel('Position (mm)')
@@ -37,24 +37,9 @@ def generate_report(
 
     # MCC Dose
     ax_mcc = fig.add_subplot(gs[0, 1])
-    if mcc_interp_data is not None and bounds is not None:
-        # Since mcc_interp_data is on the DICOM grid, we can use dicom_handler's methods
-        min_px, min_py = dicom_handler.physical_to_pixel_coord(bounds['min_x'], bounds['min_y'])
-        max_px, max_py = dicom_handler.physical_to_pixel_coord(bounds['max_x'], bounds['max_y'])
-
-        # Swap if coordinates are descending
-        if min_py > max_py: min_py, max_py = max_py, min_py
-        if min_px > max_px: min_px, max_px = max_px, min_px
-
-        # Ensure indices are within array bounds
-        min_py = max(0, min_py)
-        min_px = max(0, min_px)
-        max_py = min(mcc_interp_data.shape[0], max_py)
-        max_px = min(mcc_interp_data.shape[1], max_px)
-
-        mcc_crop_data = mcc_interp_data[min_py:max_py, min_px:max_px]
-
-        im_mcc = ax_mcc.imshow(mcc_crop_data, cmap='jet', extent=dicom_crop_extent, aspect='equal')
+    # mcc_interp_data is on the (cropped) DICOM grid
+    if mcc_interp_data is not None and dicom_extent is not None:
+        im_mcc = ax_mcc.imshow(mcc_interp_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='lower')
         fig.colorbar(im_mcc, ax=ax_mcc, label='Dose')
 
     ax_mcc.set_title('MCC Dose (Interpolated)')
@@ -76,8 +61,6 @@ def generate_report(
         ax_hor_profile.set_title('Left-Right Profile (Horizontal)')
         ax_hor_profile.legend()
         ax_hor_profile.grid(True)
-        if bounds:
-            ax_hor_profile.set_xlim(bounds['min_x'], bounds['max_x'])
 
     # Vertical Profile
     ax_ver_profile = fig.add_subplot(gs[1, 1])
@@ -92,15 +75,14 @@ def generate_report(
         ax_ver_profile.set_title('In-Out Profile (Vertical)')
         ax_ver_profile.legend()
         ax_ver_profile.grid(True)
-        if bounds:
-            ax_ver_profile.set_xlim(bounds['min_y'], bounds['max_y'])
 
     # 3. Gamma Analysis
     # Gamma Map
     ax_gamma = fig.add_subplot(gs[2, 0])
-    gamma_crop_data, gamma_crop_extent = mcc_handler.crop_array_by_bounds(gamma_map, bounds)
-    if gamma_crop_data is not None:
-        im_gamma = ax_gamma.imshow(gamma_crop_data, cmap='coolwarm', extent=gamma_crop_extent, vmin=0, vmax=2, aspect='equal')
+    mcc_extent = mcc_handler.get_physical_extent()
+    if gamma_map is not None and mcc_extent is not None:
+        # MCC data has inverted y-axis, but extent is [left, right, bottom, top] and imshow default origin is 'upper', which is correct.
+        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal')
         fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index')
     ax_gamma.set_title(f'Gamma Analysis (Pass: {gamma_stats.get("pass_rate", 0):.1f}%)')
     ax_gamma.set_xlabel('Position (mm)')

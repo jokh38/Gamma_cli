@@ -205,18 +205,6 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
             fill_value=0
         )
 
-        # ROI 적용
-        bounds = evaluation_handler.dose_bounds
-        if bounds:
-            roi_mask = (dicom_phys_x_mesh >= bounds['min_x']) & \
-                       (dicom_phys_x_mesh <= bounds['max_x']) & \
-                       (dicom_phys_y_mesh >= bounds['min_y']) & \
-                       (dicom_phys_y_mesh <= bounds['max_y'])
-
-            dicom_dose_grid[~roi_mask] = 0
-            dose_ref_gridded[~roi_mask] = 0
-            logger.info("ROI가 성공적으로 적용되었습니다.")
-
         # Step 5: Perform gamma analysis using pymedphys
         # Now that both reference and evaluation data are on the same grid, we can compare them.
         gamma_grid = pymedphys.gamma(

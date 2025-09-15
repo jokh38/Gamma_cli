@@ -1,5 +1,5 @@
 import argparse
-import json
+import yaml
 import sys
 import os
 
@@ -21,17 +21,17 @@ def main():
 
     # Load configuration
     try:
-        with open("config.json", "r") as f:
-            config = json.load(f)
+        with open("config.yaml", "r") as f:
+            config = yaml.safe_load(f)
         dta = config.get("dta", 3)
         dd = config.get("dd", 3)
         suppression_level = config.get("suppression_level", 10)
         logger.info(f"Loaded configuration: dta={dta}, dd={dd}, suppression_level={suppression_level}")
     except FileNotFoundError:
-        logger.error("Error: config.json not found. Please create it.")
+        logger.error("Error: config.yaml not found. Please create it.")
         sys.exit(1)
-    except json.JSONDecodeError:
-        logger.error("Error: Could not decode config.json. Please check its format.")
+    except yaml.YAMLError as e:
+        logger.error(f"Error: Could not parse config.yaml. Please check its format: {e}")
         sys.exit(1)
 
     # Initialize file handlers
@@ -46,6 +46,11 @@ def main():
     if not mcc_handler.open_file(args.measure):
         logger.error(f"Failed to load MCC file: {args.measure}")
         sys.exit(1)
+
+    # Crop MCC data to match the DICOM's calculated dose bounds
+    if dicom_handler.dose_bounds:
+        mcc_handler.crop_to_bounds(dicom_handler.dose_bounds)
+        logger.info("Applied DICOM bounds to MCC data.")
 
     # Perform gamma analysis
     try:
@@ -93,7 +98,6 @@ def main():
                 suppression_level,
                 ver_profile_data,
                 hor_profile_data,
-                bounds=dicom_handler.dose_bounds,
                 mcc_interp_data=mcc_interp_data
             )
             logger.info(f"Report saved to {output_filename}")
