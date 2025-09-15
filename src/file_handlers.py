@@ -3,6 +3,7 @@ This module provides classes for handling DICOM and MCC files.
 """
 import os
 import numpy as np
+import csv
 import pydicom
 from scipy.interpolate import griddata
 from utils import logger
@@ -269,17 +270,19 @@ class MCCFileHandler(BaseFileHandler):
         try:
             self.filename = filename
             with open(filename, "r") as file:
-                lines = file.read().split()
+                content = file.read()
+                lines = content.splitlines()
             
-            self.device_type, self.task_type = self.detect_device_type(lines)
+            self.device_type, self.task_type = self.detect_device_type(content)
             
-            N_begin = lines.count("BEGIN_DATA")
+            N_begin = content.count("BEGIN_DATA")
             self.n_rows = N_begin
             self.matrix_data = self.extract_data(lines, N_begin, self.device_type, self.task_type)
             self.pixel_data = self.matrix_data
             
             self._set_device_parameters()
             self.create_physical_coordinates()
+            self._save_matrix_to_csv()
             
             logger.info(f"MCC 파일 로드 완료: {self.get_device_name()}")
             return True
@@ -288,6 +291,37 @@ class MCCFileHandler(BaseFileHandler):
             error_msg = f"File open error: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
+
+    def _save_matrix_to_csv(self):
+        """Saves the extracted MCC matrix data with physical coordinates to a CSV file."""
+        if self.matrix_data is None or self.phys_x_mesh is None or self.phys_y_mesh is None:
+            logger.warning("Cannot save MCC matrix to CSV, data is not available.")
+            return
+
+        try:
+            # Define output filename
+            csv_filename = os.path.splitext(self.filename)[0] + "_matrix.csv"
+
+            # Get coordinates
+            phys_x_coords = self.phys_x_mesh[0, :]
+            phys_y_coords = self.phys_y_mesh[:, 0]
+            height, _ = self.matrix_data.shape
+
+            with open(csv_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Write header row (x-coordinates)
+                header = ['y_mm \\ x_mm'] + list(phys_x_coords)
+                writer.writerow(header)
+                
+                # Write data rows (y-coordinate + data)
+                for i in range(height):
+                    row = [phys_y_coords[i]] + list(self.matrix_data[i, :])
+                    writer.writerow(row)
+
+            logger.info(f"MCC matrix data saved to {csv_filename}")
+        except Exception as e:
+            logger.error(f"Failed to save MCC matrix to CSV: {e}", exc_info=True)
 
     def crop_to_bounds(self, bounds):
         """
@@ -355,40 +389,58 @@ class MCCFileHandler(BaseFileHandler):
             self.mcc_spacing_y = 10.0
     
     def extract_data(self, lines, N_begin, device_type, task_type):
-        
         try:
-            if task_type == 1: oct_read_intv = 3
-            else: oct_read_intv = 2
-            st_idx_j, end_idx_j = [], []
-            for j, line in enumerate(lines):
-                if line == "BEGIN_DATA": st_idx_j.append(j)
-                elif line == "END_DATA": end_idx_j.append(j)
-            delimt_ind = np.zeros((len(st_idx_j), 3), dtype=int)
-            delimt_ind[:, 0], delimt_ind[:, 1] = st_idx_j, end_idx_j
-            delimt_ind[:, 2] = delimt_ind[:, 1] - delimt_ind[:, 0] - 1
-            matrix_octavius_mat_tmp = np.zeros((N_begin, N_begin)) - 1
-            x_lngt = int(delimt_ind[0, 2] / oct_read_intv)
-            if device_type == 2 and task_type == 1:
-                for j in range(0, N_begin, 2):
-                    for k in range(x_lngt-1):
-                        matrix_octavius_mat_tmp[j, 2*k+1] = float(lines[delimt_ind[j, 0] + 2 + oct_read_intv*(k)])
-                for j in range(1, N_begin, 2):
-                    for k in range(1, x_lngt):
-                        matrix_octavius_mat_tmp[j, 2*k] = float(lines[delimt_ind[j, 0] + 2 + oct_read_intv*(k-1)])
-            else:
-                for j in range(N_begin):
-                    for k in range(x_lngt):
-                        matrix_octavius_mat_tmp[j, k] = float(lines[delimt_ind[j, 0] + 2 + oct_read_intv*k])
+            scan_data_blocks = []
+            in_data_block = False
+            current_block = []
+            for line in lines:
+                if "BEGIN_DATA" in line:
+                    in_data_block = True
+                    current_block = []
+                    continue
+                if "END_DATA" in line:
+                    in_data_block = False
+                    if current_block:
+                        scan_data_blocks.append(current_block)
+                    current_block = []
+                    continue
+                if in_data_block:
+                    current_block.append(line)
+
+            if len(scan_data_blocks) != N_begin:
+                logger.warning(f"Mismatched scan blocks. Expected {N_begin}, found {len(scan_data_blocks)}.")
+                N_begin = len(scan_data_blocks)
+
+            matrix_octavius_mat_tmp = np.full((N_begin, N_begin), -1.0)
+
+            if device_type == 2 and task_type == 1:  # OCTAVIUS 1500 XDR, non-merged (staggered)
+                for j, block in enumerate(scan_data_blocks):
+                    scan_values = [float(line.strip().split()[1]) for line in block if line.strip()]
+                    if j % 2 == 0:  # Even rows (0, 2, ...) get data in even columns
+                        for k, value in enumerate(scan_values):
+                            col_idx = 2 * k
+                            if col_idx < N_begin:
+                                matrix_octavius_mat_tmp[j, col_idx] = value
+                    else:  # Odd rows (1, 3, ...) get data in odd columns
+                        for k, value in enumerate(scan_values):
+                            col_idx = 2 * k + 1
+                            if col_idx < N_begin:
+                                matrix_octavius_mat_tmp[j, col_idx] = value
+            else:  # Fallback for other devices or merged data (assumed non-staggered)
+                for j, block in enumerate(scan_data_blocks):
+                    scan_values = [float(line.strip().split()[1]) for line in block if line.strip()]
+                    for k, value in enumerate(scan_values):
+                        if k < N_begin:
+                            matrix_octavius_mat_tmp[j, k] = value
             return matrix_octavius_mat_tmp
-            # return np.flipud(matrix_octavius_mat_tmp)
         except Exception as e:
-            logger.error(f"Data extraction error: {str(e)}")
+            logger.error(f"Data extraction error: {str(e)}", exc_info=True)
             raise
         
-    def detect_device_type(self, lines):
+    def detect_device_type(self, content):
         try:
-            is_1500 = "SCAN_DEVICE=OCTAVIUS_1500_XDR" in lines
-            is_merged = "SCAN_OFFAXIS_CROSSPLANE=0.00" in lines
+            is_1500 = "SCAN_DEVICE=OCTAVIUS_1500_XDR" in content
+            is_merged = "SCAN_OFFAXIS_CROSSPLANE=0.00" in content
             return (2 if is_1500 else 1), (2 if is_merged else 1)
         except Exception as e:
             logger.error(f"Device type detection error: {str(e)}")
@@ -407,8 +459,9 @@ class MCCFileHandler(BaseFileHandler):
     def create_physical_coordinates(self):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
-        phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = -(np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y  # y축 반전
+        # np.arrange는 0부터 시작하므로, 원점 보정을 위해 +1을 해줍니다.
+        phys_x = (np.arange(width) - self.mcc_origin_x+1) * self.mcc_spacing_x
+        phys_y = -(np.arange(height) - self.mcc_origin_y+1) * self.mcc_spacing_y  # y축 반전
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
