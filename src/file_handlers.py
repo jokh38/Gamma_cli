@@ -15,6 +15,7 @@ class BaseFileHandler:
         self.origin_x = 0
         self.origin_y = 0
         self.pixel_spacing = 1.0
+        self.dose_bounds = None
         
     def get_filename(self):
         """파일명 반환"""
@@ -49,6 +50,35 @@ class BaseFileHandler:
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
         """픽셀 좌표를 물리적 좌표(mm)로 변환 (추상 메서드)"""
         raise NotImplementedError("서브클래스에서 구현해야 함")
+
+    def _calculate_bounds_from_mask(self, mask, margin_mm=0):
+        if not np.any(mask):
+            return None
+
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+
+        row_indices = np.where(rows)[0]
+        col_indices = np.where(cols)[0]
+
+        min_row, max_row = row_indices[0], row_indices[-1]
+        min_col, max_col = col_indices[0], col_indices[-1]
+
+        min_phys_x, min_phys_y = self.pixel_to_physical_coord(min_col, min_row)
+        max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
+
+        if margin_mm > 0:
+            min_phys_x -= margin_mm
+            max_phys_x += margin_mm
+            min_phys_y -= margin_mm
+            max_phys_y += margin_mm
+
+        bounds = {
+            'min_x': min_phys_x, 'max_x': max_phys_x,
+            'min_y': min_phys_y, 'max_y': max_phys_y
+        }
+        logger.info(f"계산된 선량 경계 (물리적 좌표, {margin_mm}mm 여백 포함): {bounds}")
+        return bounds
         
     def open_file(self, filename):
         """파일 로드 (추상 메서드)"""
@@ -70,7 +100,6 @@ class DicomFileHandler(BaseFileHandler):
         self.dicom_origin_x = 0
         self.dicom_origin_y = 0
         self.pixel_spacing = 1.0
-        self.dose_bounds = None
         
     def open_file(self, filename):
         """DICOM RT dose 파일 로드"""
@@ -103,6 +132,14 @@ class DicomFileHandler(BaseFileHandler):
                 
             self.create_physical_coordinates()
             self.dose_bounds = self.calculate_dose_bounds() # 자동 크롭 기능 활성화
+
+            if self.dose_bounds:
+                x_coords, y_coords = self.phys_x_mesh, self.phys_y_mesh
+                bounds = self.dose_bounds
+                mask = (x_coords >= bounds['min_x']) & (x_coords <= bounds['max_x']) & \
+                       (y_coords >= bounds['min_y']) & (y_coords <= bounds['max_y'])
+                self.pixel_data[~mask] = 0
+                logger.info("DICOM data has been cropped to the ROI.")
             
             return True
             
@@ -124,36 +161,8 @@ class DicomFileHandler(BaseFileHandler):
             mask = dicom_image >= threshold_val
         else:
             mask = dicom_image > 0
-
-        if not np.any(mask):
-            return None
-
-        rows = np.any(mask, axis=1)
-        cols = np.any(mask, axis=0)
         
-        row_indices = np.where(rows)[0]
-        col_indices = np.where(cols)[0]
-        
-        min_row, max_row = row_indices[0], row_indices[-1]
-        min_col, max_col = col_indices[0], col_indices[-1]
-        
-        # 픽셀 좌표를 물리적 좌표로 변환
-        min_phys_x, min_phys_y = self.pixel_to_physical_coord(min_col, min_row)
-        max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
-        
-        # 물리적 좌표에 여백(margin) 추가
-        if margin_mm > 0:
-            min_phys_x -= margin_mm
-            max_phys_x += margin_mm
-            min_phys_y -= margin_mm
-            max_phys_y += margin_mm
-        
-        bounds = {
-            'min_x': min_phys_x, 'max_x': max_phys_x,
-            'min_y': min_phys_y, 'max_y': max_phys_y
-        }
-        logger.info(f"계산된 선량 경계 (물리적 좌표, {margin_mm}mm 여백 포함): {bounds}")
-        return bounds
+        return self._calculate_bounds_from_mask(mask, margin_mm)
 
     def create_physical_coordinates(self):
         if self.pixel_data is None: return
@@ -236,7 +245,16 @@ class MCCFileHandler(BaseFileHandler):
             
             self._set_device_parameters()
             self.create_physical_coordinates()
-            
+            self.dose_bounds = self.calculate_dose_bounds()
+
+            if self.dose_bounds:
+                x_coords, y_coords = self.phys_x_mesh, self.phys_y_mesh
+                bounds = self.dose_bounds
+                mask = (x_coords >= bounds['min_x']) & (x_coords <= bounds['max_x']) & \
+                       (y_coords >= bounds['max_y']) & (y_coords <= bounds['min_y'])
+                self.pixel_data[~mask] = 0
+                logger.info("MCC data has been cropped to the ROI.")
+
             logger.info(f"MCC 파일 로드 완료: {self.get_device_name()}")
             return True
                         
@@ -244,6 +262,16 @@ class MCCFileHandler(BaseFileHandler):
             error_msg = f"File open error: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
+
+    def calculate_dose_bounds(self, mcc_image=None, margin_mm=0):
+        """0이 아닌 선량 영역에 대한 경계를 계산합니다."""
+        if mcc_image is None:
+            mcc_image = self.get_pixel_data()
+        if mcc_image is None:
+            return None
+
+        mask = mcc_image > 0
+        return self._calculate_bounds_from_mask(mask, margin_mm)
     
     def _set_device_parameters(self):
         if self.device_type == 2:  # 1500

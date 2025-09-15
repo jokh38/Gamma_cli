@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Rectangle
 
 def generate_report(
     output_path,
@@ -43,12 +44,24 @@ def generate_report(
     im_dicom = ax_dicom.imshow(dicom_handler.get_pixel_data(), cmap='jet', extent=dicom_handler.get_physical_extent())
     fig.colorbar(im_dicom, ax=ax_dicom, label='Dose (Gy)')
     ax_dicom.set_title('DICOM RT Dose')
+    bounds = dicom_handler.dose_bounds
+    if bounds:
+        width = bounds['max_x'] - bounds['min_x']
+        height = bounds['max_y'] - bounds['min_y']
+        rect = Rectangle((bounds['min_x'], bounds['min_y']), width, height, linewidth=1, edgecolor='r', facecolor='none', alpha=0.7)
+        ax_dicom.add_patch(rect)
 
     # MCC Dose
     ax_mcc = fig.add_subplot(gs[1, 1])
     im_mcc = ax_mcc.imshow(mcc_handler.get_interpolated_matrix_data(), cmap='jet', extent=mcc_handler.get_physical_extent())
     fig.colorbar(im_mcc, ax=ax_mcc, label='Dose')
     ax_mcc.set_title('MCC Dose')
+    bounds = mcc_handler.dose_bounds
+    if bounds:
+        width = bounds['max_x'] - bounds['min_x']
+        height = bounds['min_y'] - bounds['max_y']
+        rect = Rectangle((bounds['min_x'], bounds['max_y']), width, height, linewidth=1, edgecolor='r', facecolor='none', alpha=0.7)
+        ax_mcc.add_patch(rect)
 
     # Gamma Map
     ax_gamma = fig.add_subplot(gs[2, 0])
@@ -62,6 +75,8 @@ def generate_report(
         ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['dicom_values'], 'b-', label='RT dose')
         if 'mcc_interp' in ver_profile_data:
             ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['mcc_interp'], 'r-', label='mcc dose')
+        if 'mcc_values' in ver_profile_data and 'mcc_phys_coords' in ver_profile_data:
+            ax_ver_profile.plot(ver_profile_data['mcc_phys_coords'], ver_profile_data['mcc_values'], 'r.', markersize=3)
         ax_ver_profile.set_xlabel('Position (mm)')
         ax_ver_profile.set_ylabel('Dose (Gy)')
         ax_ver_profile.set_title('In-Out Profile (Vertical)')
@@ -79,6 +94,8 @@ def generate_report(
         ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['dicom_values'], 'b-', label='RT dose')
         if 'mcc_interp' in hor_profile_data:
             ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['mcc_interp'], 'r-', label='mcc dose')
+        if 'mcc_values' in hor_profile_data and 'mcc_phys_coords' in hor_profile_data:
+            ax_hor_profile.plot(hor_profile_data['mcc_phys_coords'], hor_profile_data['mcc_values'], 'r.', markersize=3)
         ax_hor_profile.set_xlabel('Position (mm)')
         ax_hor_profile.set_ylabel('Dose (Gy)')
         ax_hor_profile.set_title('Left-Right Profile (Horizontal)')
