@@ -25,7 +25,7 @@ class TestGammaAnalysis(unittest.TestCase):
         """
         Test the perform_gamma_analysis function with example data.
         """
-        gamma_map, gamma_stats, phys_extent = perform_gamma_analysis(
+        gamma_map, gamma_stats, phys_extent, _ = perform_gamma_analysis(
             reference_handler=self.mcc_handler,
             evaluation_handler=self.dicom_handler,
             dose_percent_threshold=3,

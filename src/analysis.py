@@ -258,7 +258,7 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
 
         logger.info(f"Gamma analysis complete: {gamma_stats.get('total_points', 0)} points analyzed, pass rate {gamma_stats.get('pass_rate', 0):.1f}%")
 
-        return gamma_map_for_display, gamma_stats, phys_extent
+        return gamma_map_for_display, gamma_stats, phys_extent, dose_ref_gridded
 
     except Exception as e:
         logger.error(f"Error during gamma analysis: {str(e)}")
