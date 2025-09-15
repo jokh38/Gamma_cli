@@ -1,20 +1,24 @@
 
+"""
+This module provides functions for analyzing and comparing DICOM and MCC data,
+including profile extraction and gamma analysis.
+"""
 import numpy as np
 from scipy.interpolate import interpn
 from utils import logger, find_nearest_index
 
 def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=None):
     """
-    프로파일 데이터 추출 함수
-    
+    Extracts profile data from DICOM and MCC datasets.
+
     Args:
-        direction: "vertical" 또는 "horizontal"
-        fixed_position: 고정된 위치(mm)
-        dicom_handler: DICOM 영상 및 좌표 정보가 포함된 핸들러 객체
-        mcc_handler: MCC 영상 및 좌표 정보가 포함된 핸들러 객체(선택 사항)
-    
+        direction (str): "vertical" or "horizontal".
+        fixed_position (float): The fixed position in mm.
+        dicom_handler: Handler object containing DICOM image and coordinate information.
+        mcc_handler: Handler object containing MCC image and coordinate information (optional).
+
     Returns:
-        프로파일 데이터 포함 딕셔너리
+        dict: A dictionary containing the profile data.
     """
     # 프로파일 데이터 저장용 딕셔너리 초기화
     profile_data = {'type': direction, 'fixed_pos': fixed_position}
@@ -166,11 +170,23 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
                            dose_percent_threshold, distance_mm_threshold,
                            global_normalisation=True, threshold=10, max_gamma=None):
     """
-    Perform gamma analysis using pymedphys.gamma.
+    Performs gamma analysis using pymedphys.gamma.
 
     Since the reference data (MCC) is sparse and the evaluation data (DICOM) is a grid,
     the reference data is first interpolated onto the evaluation grid. Then, the two grids
     are compared using the gamma index.
+
+    Args:
+        reference_handler: Handler for the reference data (MCC).
+        evaluation_handler: Handler for the evaluation data (DICOM).
+        dose_percent_threshold (float): Dose difference threshold in percent.
+        distance_mm_threshold (float): Distance to agreement threshold in mm.
+        global_normalisation (bool, optional): Whether to use global normalization. Defaults to True.
+        threshold (int, optional): Lower dose cutoff threshold. Defaults to 10.
+        max_gamma (float, optional): Maximum gamma value to consider. Defaults to None.
+
+    Returns:
+        tuple: A tuple containing the gamma map, gamma statistics, physical extent, and the gridded reference dose.
     """
     try:
         # Step 1: Extract reference data (from MCC file)

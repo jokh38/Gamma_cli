@@ -1,3 +1,16 @@
+"""
+This script loads DICOM and MCC data, then uses linear interpolation to find the
+dose value at the physical coordinate (0,0) mm in both datasets.
+
+The script performs the following steps:
+1.  Specifies the filepaths for the DICOM and MCC files.
+2.  Loads the DICOM data and its physical coordinates using the `DicomFileHandler`.
+3.  Loads the MCC data and its physical coordinates using the `MCCFileHandler`.
+4.  Defines the point of interest at the physical origin (0,0) mm.
+5.  Uses `scipy.interpolate.interpn` to perform linear interpolation on both the
+    DICOM and MCC data to find the value at the specified point.
+6.  Prints the interpolated dose values for both datasets at (0,0) mm.
+"""
 import numpy as np
 from scipy.interpolate import interpn
 from file_handlers import DicomFileHandler, MCCFileHandler

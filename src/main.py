@@ -1,3 +1,6 @@
+"""
+This module contains the main function for running the gamma analysis from the command line.
+"""
 import argparse
 import yaml
 import sys

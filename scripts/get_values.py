@@ -1,3 +1,14 @@
+"""
+This script loads DICOM and MCC data and prints the value at the (0,0) index
+of each data matrix.
+
+The script performs the following steps:
+1.  Specifies the filepaths for the DICOM and MCC files.
+2.  Loads the DICOM data using the `DicomFileHandler`.
+3.  Loads the MCC data using the `MCCFileHandler`.
+4.  Accesses and prints the value at the (0,0) index for both the DICOM and
+    MCC data arrays.
+"""
 import numpy as np
 from file_handlers import DicomFileHandler, MCCFileHandler
 
