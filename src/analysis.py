@@ -192,27 +192,30 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         # The axes for the evaluation grid, used for both interpolation and gamma analysis.
         axes_eval_grid = (dicom_phys_y_mesh[:, 0], dicom_phys_x_mesh[0, :])
 
-        # Step 3: Align the two datasets based on the maximum dose point
-        # This is a common method to align measured and calculated dose distributions.
-        max_dose_idx_mcc = np.argmax(mcc_dose_values)
-        max_dose_coord_mcc = mcc_coords_phys[max_dose_idx_mcc]
-
-        max_dose_pixel_idx_dicom = np.unravel_index(np.argmax(dicom_dose_grid), dicom_dose_grid.shape)
-        max_dose_coord_dicom = evaluation_handler.pixel_to_physical_coord(max_dose_pixel_idx_dicom[1], max_dose_pixel_idx_dicom[0])
-
-        shift = np.array(max_dose_coord_dicom) - np.array(max_dose_coord_mcc)
-        mcc_coords_phys_shifted = mcc_coords_phys + shift
-        logger.info(f"Coordinate alignment complete (shift: dx={shift[0]:.2f}, dy={shift[1]:.2f} mm)")
+        # Step 3: 좌표계가 이미 정렬되었다고 가정합니다.
+        logger.info("좌표계 정렬 단계를 건너뛰고 원본 좌표를 사용합니다.")
 
         # Step 4: Interpolate the sparse reference (MCC) data onto the evaluation (DICOM) grid
         # pymedphys.gamma requires both datasets to be on grids.
         dose_ref_gridded = griddata(
-            mcc_coords_phys_shifted,
+            mcc_coords_phys,
             mcc_dose_values,
             (dicom_phys_x_mesh, dicom_phys_y_mesh),
             method='linear',
             fill_value=0
         )
+
+        # ROI 적용
+        bounds = evaluation_handler.dose_bounds
+        if bounds:
+            roi_mask = (dicom_phys_x_mesh >= bounds['min_x']) & \
+                       (dicom_phys_x_mesh <= bounds['max_x']) & \
+                       (dicom_phys_y_mesh >= bounds['min_y']) & \
+                       (dicom_phys_y_mesh <= bounds['max_y'])
+
+            dicom_dose_grid[~roi_mask] = 0
+            dose_ref_gridded[~roi_mask] = 0
+            logger.info("ROI가 성공적으로 적용되었습니다.")
 
         # Step 5: Perform gamma analysis using pymedphys
         # Now that both reference and evaluation data are on the same grid, we can compare them.
@@ -233,7 +236,7 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         gamma_values_at_mcc_points = griddata(
             (dicom_phys_x_mesh.ravel(), dicom_phys_y_mesh.ravel()),
             gamma_grid.ravel(),
-            mcc_coords_phys_shifted,
+            mcc_coords_phys,
             method='nearest'
         )
 

@@ -61,24 +61,33 @@ def generate_report(
     if ver_profile_data:
         ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['dicom_values'], 'b-', label='RT dose')
         if 'mcc_interp' in ver_profile_data:
-            ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['mcc_interp'], 'r-', label='Measurement (interpolated)')
+            ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['mcc_interp'], 'r-', label='mcc dose')
         ax_ver_profile.set_xlabel('Position (mm)')
         ax_ver_profile.set_ylabel('Dose (Gy)')
         ax_ver_profile.set_title('In-Out Profile (Vertical)')
         ax_ver_profile.legend()
         ax_ver_profile.grid(True)
 
+        bounds = dicom_handler.dose_bounds
+        if bounds:
+            ax_ver_profile.set_xlim(bounds['min_y'], bounds['max_y'])
+
+
     # Horizontal Profile
     ax_hor_profile = fig.add_subplot(gs[3, 1])
     if hor_profile_data:
         ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['dicom_values'], 'b-', label='RT dose')
         if 'mcc_interp' in hor_profile_data:
-            ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['mcc_interp'], 'r-', label='Measurement (interpolated)')
+            ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['mcc_interp'], 'r-', label='mcc dose')
         ax_hor_profile.set_xlabel('Position (mm)')
         ax_hor_profile.set_ylabel('Dose (Gy)')
         ax_hor_profile.set_title('Left-Right Profile (Horizontal)')
         ax_hor_profile.legend()
         ax_hor_profile.grid(True)
+
+        bounds = dicom_handler.dose_bounds
+        if bounds:
+            ax_hor_profile.set_xlim(bounds['min_x'], bounds['max_x'])
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig(output_path, format='jpeg')
