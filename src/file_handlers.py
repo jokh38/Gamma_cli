@@ -111,17 +111,20 @@ class DicomFileHandler(BaseFileHandler):
             logger.error(error_msg)
             return False, error_msg
 
-    def calculate_dose_bounds(self, dicom_image=None, threshold_percent=10, margin_mm=20):
-        """최대 선량의 특정 비율 이상인 영역의 경계를 계산합니다."""
+    def calculate_dose_bounds(self, dicom_image=None, threshold_percent=0, margin_mm=0):
+        """선량 임계값 또는 0이 아닌 선량 영역에 대한 경계를 계산합니다."""
         if dicom_image is None:
             dicom_image = self.get_pixel_data()
         if dicom_image is None:
             return None
 
-        max_dose = np.max(dicom_image)
-        threshold_val = (threshold_percent / 100.0) * max_dose
-        
-        mask = dicom_image >= threshold_val
+        if threshold_percent > 0:
+            max_dose = np.max(dicom_image)
+            threshold_val = (threshold_percent / 100.0) * max_dose
+            mask = dicom_image >= threshold_val
+        else:
+            mask = dicom_image > 0
+
         if not np.any(mask):
             return None
 
@@ -139,10 +142,11 @@ class DicomFileHandler(BaseFileHandler):
         max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
         
         # 물리적 좌표에 여백(margin) 추가
-        min_phys_x -= margin_mm
-        max_phys_x += margin_mm
-        min_phys_y -= margin_mm
-        max_phys_y += margin_mm
+        if margin_mm > 0:
+            min_phys_x -= margin_mm
+            max_phys_x += margin_mm
+            min_phys_y -= margin_mm
+            max_phys_y += margin_mm
         
         bounds = {
             'min_x': min_phys_x, 'max_x': max_phys_x,
@@ -306,16 +310,16 @@ class MCCFileHandler(BaseFileHandler):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
         phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = (np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y
+        phys_y = -(np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y  # y축 반전
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
     def physical_to_pixel_coord(self, phys_x, phys_y):
         pixel_x = int(round(phys_x / self.mcc_spacing_x + self.mcc_origin_x))
-        pixel_y = int(round(phys_y / self.mcc_spacing_y + self.mcc_origin_y))
+        pixel_y = int(round(-(phys_y / self.mcc_spacing_y) + self.mcc_origin_y))
         return pixel_x, pixel_y
     
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
         phys_x = (pixel_x - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = (pixel_y - self.mcc_origin_y) * self.mcc_spacing_y
+        phys_y = -(pixel_y - self.mcc_origin_y) * self.mcc_spacing_y
         return phys_x, phys_y
