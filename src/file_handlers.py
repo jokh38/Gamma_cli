@@ -65,8 +65,12 @@ class BaseFileHandler:
         min_row, max_row = row_indices[0], row_indices[-1]
         min_col, max_col = col_indices[0], col_indices[-1]
 
+        logger.info(f"선량 영역 픽셀 경계: row=({min_row}, {max_row}), col=({min_col}, {max_col})")
+
         min_phys_x, min_phys_y = self.pixel_to_physical_coord(min_col, min_row)
         max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
+
+        logger.info(f"픽셀 경계의 물리적 좌표 (여백 적용 전): min=({min_phys_x:.2f}, {min_phys_y:.2f}), max=({max_phys_x:.2f}, {max_phys_y:.2f})")
 
         if margin_mm > 0:
             min_phys_x -= margin_mm
@@ -126,6 +130,7 @@ class DicomFileHandler(BaseFileHandler):
                 
                 logger.info(f"DICOM 픽셀 원점 설정 (from ImagePositionPatient): x={self.dicom_origin_x}, y={self.dicom_origin_y}")
                 logger.info(f"사용된 ImagePositionPatient 값: x={self.dicom_data.ImagePositionPatient[0]}, y={self.dicom_data.ImagePositionPatient[2]}")
+                logger.info(f"사용된 PixelSpacing 값: {self.pixel_spacing}")
             else:
                 self.dicom_origin_x = -width // 2
                 self.dicom_origin_y = -height // 2
@@ -138,7 +143,7 @@ class DicomFileHandler(BaseFileHandler):
             full_phys_x_mesh = self.phys_x_mesh
             full_phys_y_mesh = self.phys_y_mesh
 
-            self.dose_bounds = self.calculate_dose_bounds(margin_mm=20) # 2cm 여백으로 ROI 자동 크롭
+            self.dose_bounds = self.calculate_dose_bounds(threshold_percent=1, margin_mm=20) # 최대 선량의 1% 이상 영역 + 2cm 여백으로 ROI 자동 크롭
 
             if self.dose_bounds:
                 bounds = self.dose_bounds
@@ -312,16 +317,26 @@ class MCCFileHandler(BaseFileHandler):
         
         logger.info(f"MCC data has been cropped to DICOM ROI. New shape: {self.matrix_data.shape}")
 
-    def calculate_dose_bounds(self, mcc_image=None, margin_mm=0):
-        """0이 아닌 선량 영역에 대한 경계를 계산합니다."""
+    def calculate_dose_bounds(self, mcc_image=None, threshold_percent=0, margin_mm=0):
+        """선량 임계값 또는 0이 아닌 선량 영역에 대한 경계를 계산합니다."""
         if mcc_image is None:
             mcc_image = self.get_pixel_data()
         if mcc_image is None:
             return None
 
-        mask = mcc_image > 0
+        if threshold_percent > 0:
+            # -1 값은 유효하지 않은 데이터이므로 제외하고 max를 계산합니다.
+            valid_data = mcc_image[mcc_image >= 0]
+            if valid_data.size == 0:
+                return None
+            max_dose = np.max(valid_data)
+            threshold_val = (threshold_percent / 100.0) * max_dose
+            mask = mcc_image >= threshold_val
+        else:
+            mask = mcc_image > 0
+        
         return self._calculate_bounds_from_mask(mask, margin_mm)
-    
+
     def _set_device_parameters(self):
         if self.device_type == 2:  # 1500
             self.mcc_origin_x = 27

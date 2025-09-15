@@ -72,10 +72,16 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
                     
                     # 전체 프로파일 시각화를 위한 보간 생성
                     if len(mcc_values) > 1:
+                        # np.interp는 x좌표(mcc_phys_y_coords)가 단조롭게 증가할 것을 요구합니다.
+                        # MCC 핸들러의 y좌표는 감소 순서이므로, 보간 전에 정렬해야 합니다.
+                        sort_indices = np.argsort(mcc_phys_y_coords)
+                        sorted_mcc_phys_y = mcc_phys_y_coords[sort_indices]
+                        sorted_mcc_values = mcc_values[sort_indices]
+
                         mcc_interp = np.interp(
                             phys_y_coords,
-                            mcc_phys_y_coords,
-                            mcc_values,
+                            sorted_mcc_phys_y,
+                            sorted_mcc_values,
                             left=np.nan, right=np.nan
                         )
                         
