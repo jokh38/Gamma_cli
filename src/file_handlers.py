@@ -339,7 +339,8 @@ class MCCFileHandler(BaseFileHandler):
                 for j in range(N_begin):
                     for k in range(x_lngt):
                         matrix_octavius_mat_tmp[j, k] = float(lines[delimt_ind[j, 0] + 2 + oct_read_intv*k])
-            return np.flipud(matrix_octavius_mat_tmp)
+            return matrix_octavius_mat_tmp
+            # return np.flipud(matrix_octavius_mat_tmp)
         except Exception as e:
             logger.error(f"Data extraction error: {str(e)}")
             raise
