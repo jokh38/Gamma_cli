@@ -37,7 +37,7 @@ def generate_report(
     dicom_data = dicom_handler.get_pixel_data()
     dicom_extent = dicom_handler.get_physical_extent()
     if dicom_data is not None and dicom_extent is not None:
-        im_dicom = ax_dicom.imshow(dicom_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='upper')
+        im_dicom = ax_dicom.imshow(dicom_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='lower')
         fig.colorbar(im_dicom, ax=ax_dicom, label='Dose (Gy)')
     ax_dicom.set_title('DICOM RT Dose')
     ax_dicom.set_xlabel('Position (mm)')
@@ -47,7 +47,7 @@ def generate_report(
     ax_mcc = fig.add_subplot(gs[0, 1])
     # mcc_interp_data is on the (cropped) DICOM grid
     if mcc_interp_data is not None and dicom_extent is not None:
-        im_mcc = ax_mcc.imshow(mcc_interp_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='upper')
+        im_mcc = ax_mcc.imshow(mcc_interp_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='lower')
         fig.colorbar(im_mcc, ax=ax_mcc, label='Dose')
 
     ax_mcc.set_title('MCC Dose (Interpolated)')
