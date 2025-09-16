@@ -3,10 +3,14 @@ This module provides classes for handling DICOM and MCC files.
 """
 import os
 import numpy as np
+import yaml
+import sys
 import csv
 import pydicom
 from scipy.interpolate import griddata
 from utils import logger
+
+
 
 class BaseFileHandler:
     """Base class for various file handlers."""
@@ -21,6 +25,22 @@ class BaseFileHandler:
         self.pixel_spacing = 1.0
         self.dose_bounds = None
         self.crop_pixel_offset = (0, 0)
+            
+        # Load configuration
+        try:
+            with open("config.yaml", "r") as f:
+                config = yaml.safe_load(f)
+            self.dta = config.get("dta", 3)
+            self.dd = config.get("dd", 3)
+            self.suppression_level = config.get("suppression_level", 10)
+            self.roi_margin = config.get("roi_margin", 2)
+            logger.info(f"Loaded configuration: dta={self.dta}, dd={self.dd}, suppression_level={self.suppression_level}, roi_margin={self.roi_margin}")
+        except FileNotFoundError:
+            logger.error("Error: config.yaml not found. Please create it.")
+            sys.exit(1)
+        except yaml.YAMLError as e:
+            logger.error(f"Error: Could not parse config.yaml. Please check its format: {e}")
+            sys.exit(1)
         
     def get_filename(self):
         """Returns the filename."""
@@ -44,7 +64,11 @@ class BaseFileHandler:
         """Returns the pixel data."""
         return self.pixel_data
     
-    def create_physical_coordinates(self):
+    def create_physical_coordinates_dcm(self):
+        """Creates the physical coordinate system (abstract method)."""
+        raise NotImplementedError("Must be implemented in subclass")
+    
+    def create_physical_coordinates_mcc(self):
         """Creates the physical coordinate system (abstract method)."""
         raise NotImplementedError("Must be implemented in subclass")
     
@@ -167,14 +191,14 @@ class DicomFileHandler(BaseFileHandler):
                 self.dicom_origin_y = -height // 2
                 logger.warning(f"DICOM 원점 정보 없음. 이미지 중심으로 기본값 설정: ({self.dicom_origin_x}, {self.dicom_origin_y})")
                 
-            self.create_physical_coordinates()
+            self.create_physical_coordinates_dcm()
 
             # 원본 데이터 및 좌표 보존
             full_pixel_data = self.pixel_data
             full_phys_x_mesh = self.phys_x_mesh
             full_phys_y_mesh = self.phys_y_mesh
 
-            self.dose_bounds = self.calculate_dose_bounds(threshold_percent=1, margin_mm=20) # 최대 선량의 1% 이상 영역 + 2cm 여백으로 ROI 자동 크롭
+            self.dose_bounds = self.calculate_dose_bounds(threshold_percent=1, margin_mm=self.roi_margin) # 최대 선량의 1% 이상 영역 + 2cm 여백으로 ROI 자동 크롭
 
             if self.dose_bounds:
                 bounds = self.dose_bounds
@@ -204,13 +228,6 @@ class DicomFileHandler(BaseFileHandler):
             logger.error(error_msg)
             return False, error_msg
 
-    def create_physical_coordinates(self):
-        if self.pixel_data is None: return
-        height, width = self.pixel_data.shape
-        phys_x = (np.arange(width) + self.dicom_origin_x) * self.pixel_spacing
-        phys_y = (np.arange(height) + self.dicom_origin_y) * self.pixel_spacing
-        self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
-        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
 
     def physical_to_pixel_coord(self, phys_x, phys_y):
         full_grid_px = phys_x / self.pixel_spacing - self.dicom_origin_x
@@ -245,6 +262,15 @@ class DicomFileHandler(BaseFileHandler):
         patient_name = self.dicom_data.get("PatientName", "N/A")
 
         return institution, patient_id, patient_name
+
+    def create_physical_coordinates_dcm(self):
+        if self.pixel_data is None: return
+        height, width = self.pixel_data.shape
+        phys_x = (np.arange(width) + self.dicom_origin_x) * self.pixel_spacing
+        phys_y = (np.arange(height) + self.dicom_origin_y) * self.pixel_spacing
+        self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
+        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
+
 
 class MCCFileHandler(BaseFileHandler):
     """Class for handling MCC files."""
@@ -292,7 +318,7 @@ class MCCFileHandler(BaseFileHandler):
             self.pixel_data = self.matrix_data
             
             self._set_device_parameters()
-            self.create_physical_coordinates()
+            self.create_physical_coordinates_mcc()
             
             logger.info(f"MCC 파일 로드 완료: {self.get_device_name()}")
             return True
@@ -337,8 +363,8 @@ class MCCFileHandler(BaseFileHandler):
 
     def _set_device_parameters(self):
         if self.device_type == 2:  # 1500
-            self.mcc_origin_x = 27
-            self.mcc_origin_y = 27
+            self.mcc_origin_x = 26
+            self.mcc_origin_y = 26
             self.mcc_spacing_x = 5.0
             self.mcc_spacing_y = 5.0
         else:  # 725
@@ -415,12 +441,11 @@ class MCCFileHandler(BaseFileHandler):
     def get_spacing(self):
         return self.mcc_spacing_x, self.mcc_spacing_y
 
-    def create_physical_coordinates(self):
+    def create_physical_coordinates_mcc(self):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
-        # np.arrange는 0부터 시작하므로, 원점 보정을 위해 +1을 해줍니다.
-        phys_x = (np.arange(width) - self.mcc_origin_x+1) * self.mcc_spacing_x
-        phys_y = -(np.arange(height) - self.mcc_origin_y+1) * self.mcc_spacing_y  # y축 반전
+        phys_x = (np.arange(width) - self.mcc_origin_x + 1) * self.mcc_spacing_x
+        phys_y = -(np.arange(height) - self.mcc_origin_y + 1) * self.mcc_spacing_y  # y축 반전
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
