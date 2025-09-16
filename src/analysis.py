@@ -113,7 +113,8 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
 
 def perform_gamma_analysis(reference_handler, evaluation_handler,
                            dose_percent_threshold, distance_mm_threshold,
-                           global_normalisation=True, threshold=10, max_gamma=None):
+                           global_normalisation=True, threshold=10, max_gamma=None,
+                           save_csv=False, csv_dir=None):
     """
     보간(interpolation) 없이 sparse한 기준점(MCC)과 dense한 평가 그리드(DICOM)
     사이에 감마 인덱스를 직접 계산합니다.
@@ -125,6 +126,8 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         distance_mm_threshold (float): 거리 기준 (mm)
         global_normalisation (bool): 전역 정규화 사용 여부
         threshold (int): 분석에 포함할 최소 선량 임계값 (%)
+        save_csv (bool): 분석 맵을 CSV로 저장할지 여부
+        csv_dir (str): CSV 파일을 저장할 디렉토리
 
     Returns:
         tuple: (감마 맵, 감마 통계, 물리적 범위, MCC 보간 데이터(시각화용), DD 맵, DTA 맵, DD 통계, DTA 통계)
@@ -319,17 +322,21 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         )
 
         # --- Step 6: Save maps to CSV ---
-        try:
-            base_filename, _ = os.path.splitext(reference_handler.filename)
-            mcc_phys_x_mesh = reference_handler.phys_x_mesh
-            mcc_phys_y_mesh = reference_handler.phys_y_mesh
+        if save_csv and csv_dir:
+            try:
+                base_filename = os.path.splitext(os.path.basename(reference_handler.filename))[0]
+                mcc_phys_x_mesh = reference_handler.phys_x_mesh
+                mcc_phys_y_mesh = reference_handler.phys_y_mesh
 
-            if gamma_stats.get('total_points', 0) > 0:
-                save_map_to_csv(gamma_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, f"{base_filename}_gamma.csv")
-                save_map_to_csv(dd_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, f"{base_filename}_dd.csv")
-                save_map_to_csv(dta_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, f"{base_filename}_dta.csv")
-        except Exception as e:
-            logger.error(f"Failed to save analysis maps to CSV: {e}", exc_info=True)
+                if gamma_stats.get('total_points', 0) > 0:
+                    gamma_path = os.path.join(csv_dir, f"{base_filename}_gamma.csv")
+                    dd_path = os.path.join(csv_dir, f"{base_filename}_dd.csv")
+                    dta_path = os.path.join(csv_dir, f"{base_filename}_dta.csv")
+                    save_map_to_csv(gamma_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, gamma_path)
+                    save_map_to_csv(dd_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, dd_path)
+                    save_map_to_csv(dta_map_for_display, mcc_phys_x_mesh, mcc_phys_y_mesh, dta_path)
+            except Exception as e:
+                logger.error(f"Failed to save analysis maps to CSV: {e}", exc_info=True)
 
         return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data, dd_map_for_display, dta_map_for_display, dd_stats, dta_stats
 

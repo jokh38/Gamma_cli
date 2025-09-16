@@ -63,7 +63,7 @@ def generate_report(
         if 'mcc_interp' in hor_profile_data:
             ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['mcc_interp'], 'r--', linewidth=2, label='mcc dose (y=0)')
         if 'mcc_values' in hor_profile_data and 'mcc_phys_coords' in hor_profile_data:
-            ax_hor_profile.plot(hor_profile_data['mcc_phys_coords'], hor_profile_data['mcc_values'], 'r.', markersize=3)
+            ax_hor_profile.plot(hor_profile_data['mcc_phys_coords'], hor_profile_data['mcc_values'], 'ro', markersize=8)
             
         # # Add shifted profiles if available
         # if additional_profiles:
@@ -92,7 +92,7 @@ def generate_report(
         if 'mcc_interp' in ver_profile_data:
             ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['mcc_interp'], 'r--', linewidth=2, label='mcc dose (x=0)')
         if 'mcc_values' in ver_profile_data and 'mcc_phys_coords' in ver_profile_data:
-            ax_ver_profile.plot(ver_profile_data['mcc_phys_coords'], ver_profile_data['mcc_values'], 'r.', markersize=3)
+            ax_ver_profile.plot(ver_profile_data['mcc_phys_coords'], ver_profile_data['mcc_values'], 'ro', markersize=8)
             
         # # Add shifted profiles if available
         # if additional_profiles:

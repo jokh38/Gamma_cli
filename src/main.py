@@ -29,7 +29,9 @@ def main():
         dta = config.get("dta", 3)
         dd = config.get("dd", 3)
         suppression_level = config.get("suppression_level", 10)
-        logger.info(f"Loaded configuration: dta={dta}, dd={dd}, suppression_level={suppression_level}")
+        save_csv = config.get("save_csv", False)
+        csv_dir = config.get("csv_export_path", "csv_exports")
+        logger.info(f"Loaded configuration: dta={dta}, dd={dd}, suppression_level={suppression_level}, save_csv={save_csv}, csv_export_path='{csv_dir}'")
     except FileNotFoundError:
         logger.error("Error: config.yaml not found. Please create it.")
         sys.exit(1)
@@ -55,38 +57,40 @@ def main():
         mcc_handler.crop_to_bounds(dicom_handler.dose_bounds)
         logger.info("Applied DICOM bounds to MCC data.")
 
-    # Save ROI data to CSV in a dedicated directory
-    csv_dir = "csv_exports"
-    os.makedirs(csv_dir, exist_ok=True)
+    if save_csv:
+        # Save ROI data to CSV in a dedicated directory
+        os.makedirs(csv_dir, exist_ok=True)
 
-    # Save DICOM ROI data
-    dicom_basename = os.path.splitext(os.path.basename(args.rtplan))[0]
-    dicom_csv_path = os.path.join(csv_dir, f"{dicom_basename}_dicom_roi.csv")
-    save_map_to_csv(
-        dicom_handler.get_pixel_data(),
-        dicom_handler.phys_x_mesh,
-        dicom_handler.phys_y_mesh,
-        dicom_csv_path
-    )
+        # Save DICOM ROI data
+        dicom_basename = os.path.splitext(os.path.basename(args.rtplan))[0]
+        dicom_csv_path = os.path.join(csv_dir, f"{dicom_basename}_dicom_roi.csv")
+        save_map_to_csv(
+            dicom_handler.get_pixel_data(),
+            dicom_handler.phys_x_mesh,
+            dicom_handler.phys_y_mesh,
+            dicom_csv_path
+        )
 
-    # Save MCC ROI data
-    mcc_basename = os.path.splitext(os.path.basename(args.measure))[0]
-    mcc_csv_path = os.path.join(csv_dir, f"{mcc_basename}_mcc_roi.csv")
-    save_map_to_csv(
-        mcc_handler.get_pixel_data(),
-        mcc_handler.phys_x_mesh,
-        mcc_handler.phys_y_mesh,
-        mcc_csv_path
-    )
+        # Save MCC ROI data
+        mcc_basename = os.path.splitext(os.path.basename(args.measure))[0]
+        mcc_csv_path = os.path.join(csv_dir, f"{mcc_basename}_mcc_roi.csv")
+        save_map_to_csv(
+            mcc_handler.get_pixel_data(),
+            mcc_handler.phys_x_mesh,
+            mcc_handler.phys_y_mesh,
+            mcc_csv_path
+        )
 
     # Perform gamma analysis
     try:
         gamma_map, gamma_stats, phys_extent, mcc_interp_data, dd_map, dta_map, dd_stats, dta_stats = perform_gamma_analysis(
             mcc_handler, dicom_handler,
             dd, dta,
-            global_normalisation=True,  # Assuming global gamma, can be made configurable
+            global_normalisation=True,
             threshold=suppression_level,
-            max_gamma=None
+            max_gamma=None,
+            save_csv=save_csv,
+            csv_dir=csv_dir
         )
 
         if 'pass_rate' in gamma_stats:

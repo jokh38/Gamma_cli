@@ -33,6 +33,8 @@ The analysis parameters are configured through a `config.yaml` file in the root 
 dta: 3
 dd: 3
 suppression_level: 10
+save_csv: true
+csv_export_path: "csv_exports"
 ```
 
 - `dta`: Distance-to-agreement in millimeters (e.g., 3).
