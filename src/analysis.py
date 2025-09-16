@@ -256,7 +256,7 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
             gamma_values[i] = min_gamma
             
             # Store dd and dta values at the minimum gamma point
-            dd_values[i] = np.sqrt(dose_diff_sq[min_idx]) / (dose_percent_threshold / 100.0 * (norm_dose if global_normalisation else dose_ref)) * 100
+            dd_values[i] = np.sqrt(dose_diff_sq[min_idx]) / (dose_percent_threshold / 100.0 * (norm_dose if global_normalisation else dose_ref))
             dta_values[i] = np.sqrt(dist_sq[min_idx]) / distance_mm_threshold
             
             # Progress logging for large datasets

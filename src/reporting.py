@@ -154,20 +154,20 @@ def generate_report(
     if dd_stats:
         dd_text = (
             f"\nDD Analysis:\n"
-            f"  Mean: {dd_stats.get('mean', 0):.2f} %\n"
-            f"  Max: {dd_stats.get('max', 0):.2f} %\n"
-            f"  Min: {dd_stats.get('min', 0):.2f} %\n"
-            f"  Std: {dd_stats.get('std', 0):.2f} %\n"
+            f"  Mean: {dd_stats.get('mean', 0):.2f} \n"
+            f"  Max: {dd_stats.get('max', 0):.2f} \n"
+            f"  Min: {dd_stats.get('min', 0):.2f} \n"
+            f"  Std: {dd_stats.get('std', 0):.2f} \n"
         )
     
     dta_text = ""
     if dta_stats:
         dta_text = (
             f"\nDTA Analysis:\n"
-            f"  Mean: {dta_stats.get('mean', 0):.2f} mm\n"
-            f"  Max: {dta_stats.get('max', 0):.2f} mm\n"
-            f"  Min: {dta_stats.get('min', 0):.2f} mm\n"
-            f"  Std: {dta_stats.get('std', 0):.2f} mm\n"
+            f"  Mean: {dta_stats.get('mean', 0):.2f} \n"
+            f"  Max: {dta_stats.get('max', 0):.2f} \n"
+            f"  Min: {dta_stats.get('min', 0):.2f} \n"
+            f"  Std: {dta_stats.get('std', 0):.2f} \n"
         )
     
     stats_text = gamma_text + dd_text + dta_text

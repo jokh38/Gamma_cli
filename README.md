@@ -55,6 +55,7 @@ The repository includes sample data in the `data/` directory.
 
 ```bash
 python src/main.py --rtplan data/1G240_2cm.dcm --measure data/1G240_2cm.mcc
+python src/main.py --rtplan data/104659/RD.1G.dcm --measure data/104659/1G_020mm.mcc
 ```
 
 The tool will print the gamma analysis results to the console and save a report image in the `reports/` directory.
