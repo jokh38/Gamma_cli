@@ -88,6 +88,33 @@ class BaseFileHandler:
         }
         logger.info(f"계산된 선량 경계 (물리적 좌표, {margin_mm}mm 여백 포함): {bounds}")
         return bounds
+
+    def calculate_dose_bounds(self, image_data=None, threshold_percent=0, margin_mm=0):
+        """Calculates the bounds for a dose area based on a threshold or non-zero dose."""
+        if image_data is None:
+            image_data = self.get_pixel_data()
+        if image_data is None:
+            return None
+
+        if threshold_percent > 0:
+            # For MCC, -1 values are invalid. This filter is safe for DICOM too.
+            valid_data = image_data[image_data >= 0]
+            if valid_data.size == 0:
+                return None # Cannot determine bounds if no valid data
+            
+            max_dose = np.max(valid_data)
+            if max_dose > 0:
+                threshold_val = (threshold_percent / 100.0) * max_dose
+                mask = image_data >= threshold_val
+            else:
+                # If max dose is 0, all valid points are 0.
+                # The mask should include these points.
+                mask = image_data >= 0
+        else:
+            # If no threshold, consider all points with dose > 0
+            mask = image_data > 0
+        
+        return self._calculate_bounds_from_mask(mask, margin_mm)
         
     def open_file(self, filename):
         """Loads a file (abstract method)."""
@@ -176,22 +203,6 @@ class DicomFileHandler(BaseFileHandler):
             error_msg = f"DICOM 파일 로드 오류: {e}"
             logger.error(error_msg)
             return False, error_msg
-
-    def calculate_dose_bounds(self, dicom_image=None, threshold_percent=0, margin_mm=0):
-        """Calculates the bounds for a dose area based on a threshold or non-zero dose."""
-        if dicom_image is None:
-            dicom_image = self.get_pixel_data()
-        if dicom_image is None:
-            return None
-
-        if threshold_percent > 0:
-            max_dose = np.max(dicom_image)
-            threshold_val = (threshold_percent / 100.0) * max_dose
-            mask = dicom_image >= threshold_val
-        else:
-            mask = dicom_image > 0
-        
-        return self._calculate_bounds_from_mask(mask, margin_mm)
 
     def create_physical_coordinates(self):
         if self.pixel_data is None: return
@@ -355,26 +366,6 @@ class MCCFileHandler(BaseFileHandler):
         self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.min(), self.phys_y_mesh.max()]
         
         logger.info(f"MCC data has been cropped to DICOM ROI. New shape: {self.matrix_data.shape}")
-
-    def calculate_dose_bounds(self, mcc_image=None, threshold_percent=0, margin_mm=0):
-        """Calculates the bounds for a dose area based on a threshold or non-zero dose."""
-        if mcc_image is None:
-            mcc_image = self.get_pixel_data()
-        if mcc_image is None:
-            return None
-
-        if threshold_percent > 0:
-            # -1 값은 유효하지 않은 데이터이므로 제외하고 max를 계산합니다.
-            valid_data = mcc_image[mcc_image >= 0]
-            if valid_data.size == 0:
-                return None
-            max_dose = np.max(valid_data)
-            threshold_val = (threshold_percent / 100.0) * max_dose
-            mask = mcc_image >= threshold_val
-        else:
-            mask = mcc_image > 0
-        
-        return self._calculate_bounds_from_mask(mask, margin_mm)
 
     def _set_device_parameters(self):
         if self.device_type == 2:  # 1500

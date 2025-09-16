@@ -20,147 +20,94 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
     Returns:
         dict: A dictionary containing the profile data.
     """
-    # 프로파일 데이터 저장용 딕셔너리 초기화
     profile_data = {'type': direction, 'fixed_pos': fixed_position}
     
-    # DICOM 이미지 데이터 추출
     dicom_image = dicom_handler.get_pixel_data()
-    dicom_phys_x_mesh = dicom_handler.phys_x_mesh
-    dicom_phys_y_mesh = dicom_handler.phys_y_mesh
+    if dicom_image is None:
+        logger.warning("DICOM pixel data not available for profile extraction.")
+        return profile_data
     
     try:
-        # 프로파일 방향에 따라 다르게 처리
+        # Define axis-dependent variables based on direction
         if direction == "vertical":
-            # 수직 프로파일: x 좌표 고정, y 변화
-            phys_x = fixed_position  # 고정된 물리적 x 좌표(mm)
-            
-            # 물리적 좌표에서 가장 가까운 x 인덱스 찾기
-            phys_x_coords = dicom_phys_x_mesh[0, :]
-            closest_x_idx = find_nearest_index(phys_x_coords, phys_x)
-            
-            # 해당 열의 물리적 y 좌표 가져오기
-            phys_y_coords = dicom_phys_y_mesh[:, closest_x_idx]
-            
-            # DICOM 값 추출
-            dicom_values = dicom_image[:, closest_x_idx]
-            
-            # 데이터 저장
-            profile_data['phys_coords'] = phys_y_coords  # 물리적 y 좌표(mm)
-            profile_data['dicom_values'] = dicom_values
-            
-            # MCC 데이터가 있는 경우 처리
-            if mcc_handler is not None:
-                mcc_image = mcc_handler.get_matrix_data()
-                mcc_phys_x_mesh = mcc_handler.phys_x_mesh
-                mcc_phys_y_mesh = mcc_handler.phys_y_mesh
-                
-                # 물리적 좌표에서 가장 가까운 x 인덱스 찾기
-                mcc_phys_x_array = mcc_phys_x_mesh[0, :]
-                mcc_closest_x_idx = find_nearest_index(mcc_phys_x_array, phys_x)
-                
-                # 유효한 MCC 값만 추출(-1 이상인 값)
-                valid_indices = np.where(mcc_image[:, mcc_closest_x_idx] >= 0)[0]
-                
-                if len(valid_indices) > 0:
-                    # 유효한 해상도에서 실제 MCC 데이터 포인트 가져오기
-                    mcc_phys_y_coords = mcc_phys_y_mesh[valid_indices, mcc_closest_x_idx]
-                    mcc_values = mcc_image[valid_indices, mcc_closest_x_idx]
-                    
-                    # MCC 위치에서의 DICOM 값을 위한 배열 생성
-                    dicom_at_mcc_positions = np.full_like(mcc_values, np.nan)
-                    
-                    # 각 MCC 포인트에 대해 가장 가까운 DICOM 값 찾기
-                    for i, mcc_y in enumerate(mcc_phys_y_coords):
-                        closest_y_idx = find_nearest_index(phys_y_coords, mcc_y)
-                        dicom_at_mcc_positions[i] = dicom_values[closest_y_idx]
-                    
-                    # 전체 프로파일 시각화를 위한 보간 생성
-                    if len(mcc_values) > 1:
-                        # np.interp는 x좌표(mcc_phys_y_coords)가 단조롭게 증가할 것을 요구합니다.
-                        # MCC 핸들러의 y좌표는 감소 순서이므로, 보간 전에 정렬해야 합니다.
-                        sort_indices = np.argsort(mcc_phys_y_coords)
-                        sorted_mcc_phys_y = mcc_phys_y_coords[sort_indices]
-                        sorted_mcc_values = mcc_values[sort_indices]
+            # Vertical profile: x is fixed, y is the profile axis
+            fixed_axis_coords_dicom = dicom_handler.phys_x_mesh[0, :]
+            profile_axis_mesh_dicom = dicom_handler.phys_y_mesh
+            slicer_dicom = lambda idx: (slice(None), idx)
+            if mcc_handler:
+                mcc_fixed_axis_coords = mcc_handler.phys_x_mesh[0, :]
+                mcc_profile_axis_mesh = mcc_handler.phys_y_mesh
+                slicer_mcc = lambda idx: (slice(None), idx)
+                sort_required = True  # MCC y-axis is inverted and needs sorting for interpolation
+        else:  # "horizontal"
+            # Horizontal profile: y is fixed, x is the profile axis
+            fixed_axis_coords_dicom = dicom_handler.phys_y_mesh[:, 0]
+            profile_axis_mesh_dicom = dicom_handler.phys_x_mesh
+            slicer_dicom = lambda idx: (idx, slice(None))
+            if mcc_handler:
+                mcc_fixed_axis_coords = mcc_handler.phys_y_mesh[:, 0]
+                mcc_profile_axis_mesh = mcc_handler.phys_x_mesh
+                slicer_mcc = lambda idx: (idx, slice(None))
+                sort_required = False # MCC x-axis is already sorted
 
-                        mcc_interp = np.interp(
-                            phys_y_coords,
-                            sorted_mcc_phys_y,
-                            sorted_mcc_values,
-                            left=np.nan, right=np.nan
-                        )
-                        
-                        profile_data['mcc_phys_coords'] = mcc_phys_y_coords
-                        profile_data['mcc_values'] = mcc_values
-                        profile_data['mcc_interp'] = mcc_interp
-                        
-                        # 테이블용 MCC 위치에서의 DICOM 값 저장
-                        profile_data['dicom_at_mcc'] = dicom_at_mcc_positions
-                        
-        else:
-            # 수평 프로파일: y 좌표 고정, x 변화
-            phys_y = fixed_position  # 고정된 물리적 y 좌표(mm)
+        # --- Common Logic for both directions ---
+
+        # 1. Extract DICOM profile
+        closest_idx_dicom = find_nearest_index(fixed_axis_coords_dicom, fixed_position)
+        profile_coords_dicom = profile_axis_mesh_dicom[slicer_dicom(closest_idx_dicom)]
+        dicom_values = dicom_image[slicer_dicom(closest_idx_dicom)]
+        
+        profile_data['phys_coords'] = profile_coords_dicom
+        profile_data['dicom_values'] = dicom_values
+
+        # 2. Process MCC data if available
+        if mcc_handler and mcc_handler.get_matrix_data() is not None:
+            mcc_image = mcc_handler.get_matrix_data()
             
-            # 물리적 좌표에서 가장 가까운 y 인덱스 찾기
-            phys_y_coords = dicom_phys_y_mesh[:, 0]
-            closest_y_idx = find_nearest_index(phys_y_coords, phys_y)
+            closest_idx_mcc = find_nearest_index(mcc_fixed_axis_coords, fixed_position)
+            mcc_line_values = mcc_image[slicer_mcc(closest_idx_mcc)]
             
-            # 해당 행의 물리적 x 좌표 가져오기
-            phys_x_coords = dicom_phys_x_mesh[closest_y_idx, :]
+            valid_indices = np.where(mcc_line_values >= 0)[0]
             
-            # DICOM 값 추출
-            dicom_values = dicom_image[closest_y_idx, :]
-            
-            # 데이터 저장
-            profile_data['phys_coords'] = phys_x_coords  # 물리적 x 좌표(mm)
-            profile_data['dicom_values'] = dicom_values
-            
-            # MCC 데이터가 있는 경우 처리
-            if mcc_handler is not None:
-                mcc_image = mcc_handler.get_matrix_data()
-                mcc_phys_x_mesh = mcc_handler.phys_x_mesh
-                mcc_phys_y_mesh = mcc_handler.phys_y_mesh
+            if len(valid_indices) > 0:
+                # Get physical coordinates and dose values for valid MCC points
+                if direction == "vertical":
+                    mcc_phys_coords = mcc_profile_axis_mesh[valid_indices, closest_idx_mcc]
+                else: # horizontal
+                    mcc_phys_coords = mcc_profile_axis_mesh[closest_idx_mcc, valid_indices]
                 
-                # 물리적 좌표에서 가장 가까운 y 인덱스 찾기
-                mcc_phys_y_array = mcc_phys_y_mesh[:, 0]
-                mcc_closest_y_idx = find_nearest_index(mcc_phys_y_array, phys_y)
+                mcc_values = mcc_line_values[valid_indices]
                 
-                # 유효한 MCC 값만 추출(-1 이상인 값)
-                valid_indices = np.where(mcc_image[mcc_closest_y_idx, :] >= 0)[0]
+                # Find corresponding DICOM values at MCC measurement points
+                dicom_at_mcc_positions = np.array([
+                    dicom_values[find_nearest_index(profile_coords_dicom, pos)] for pos in mcc_phys_coords
+                ])
                 
-                if len(valid_indices) > 0:
-                    # 유효한 해상도에서 실제 MCC 데이터 포인트 가져오기
-                    mcc_phys_x_coords = mcc_phys_x_mesh[mcc_closest_y_idx, valid_indices]
-                    mcc_values = mcc_image[mcc_closest_y_idx, valid_indices]
+                # Interpolate MCC data for smooth plotting
+                if len(mcc_values) > 1:
+                    interp_coords = mcc_phys_coords
+                    interp_values = mcc_values
+                    if sort_required:
+                        sort_indices = np.argsort(interp_coords)
+                        interp_coords = interp_coords[sort_indices]
+                        interp_values = interp_values[sort_indices]
                     
-                    # MCC 위치에서의 DICOM 값을 위한 배열 생성
-                    dicom_at_mcc_positions = np.full_like(mcc_values, np.nan)
-                    
-                    # 각 MCC 포인트에 대해 가장 가까운 DICOM 값 찾기
-                    for i, mcc_x in enumerate(mcc_phys_x_coords):
-                        closest_x_idx = find_nearest_index(phys_x_coords, mcc_x)
-                        dicom_at_mcc_positions[i] = dicom_values[closest_x_idx]
-                    
-                    # 전체 프로파일 시각화를 위한 보간 생성
-                    if len(mcc_values) > 1:
-                        mcc_interp = np.interp(
-                            phys_x_coords,
-                            mcc_phys_x_coords,
-                            mcc_values,
-                            left=np.nan, right=np.nan
-                        )
-                        
-                        profile_data['mcc_phys_coords'] = mcc_phys_x_coords
-                        profile_data['mcc_values'] = mcc_values
-                        profile_data['mcc_interp'] = mcc_interp
-                        
-                        # 테이블용 MCC 위치에서의 DICOM 값 저장
-                        profile_data['dicom_at_mcc'] = dicom_at_mcc_positions
-    
+                    mcc_interp = np.interp(
+                        profile_coords_dicom,
+                        interp_coords,
+                        interp_values,
+                        left=np.nan, right=np.nan
+                    )
+                    profile_data['mcc_interp'] = mcc_interp
+
+                profile_data['mcc_phys_coords'] = mcc_phys_coords
+                profile_data['mcc_values'] = mcc_values
+                profile_data['dicom_at_mcc'] = dicom_at_mcc_positions
+
         return profile_data
         
     except Exception as e:
-        logger.error(f"프로파일 데이터 추출 오류: {str(e)}")
-        # 오류 발생 시 기본 데이터만 반환
+        logger.error(f"프로파일 데이터 추출 오류: {str(e)}", exc_info=True)
         return profile_data
 
 import pymedphys
@@ -172,9 +119,9 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
     """
     Performs gamma analysis using pymedphys.gamma.
 
-    Since the reference data (MCC) is sparse and the evaluation data (DICOM) is a grid,
-    the reference data is first interpolated onto the evaluation grid. Then, the two grids
-    are compared using the gamma index.
+    The reference data (MCC) is sparse, and the evaluation data (DICOM) is a grid.
+    This function uses the sparse MCC measurement points, filtered by a dose threshold,
+    directly as the reference for the gamma calculation against the DICOM dose grid.
 
     Args:
         reference_handler: Handler for the reference data (MCC).
@@ -182,79 +129,95 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         dose_percent_threshold (float): Dose difference threshold in percent.
         distance_mm_threshold (float): Distance to agreement threshold in mm.
         global_normalisation (bool, optional): Whether to use global normalization. Defaults to True.
-        threshold (int, optional): Lower dose cutoff threshold. Defaults to 10.
+        threshold (int, optional): Lower dose cutoff threshold as a percentage of the normalization dose. Defaults to 10.
         max_gamma (float, optional): Maximum gamma value to consider. Defaults to None.
 
     Returns:
-        tuple: A tuple containing the gamma map, gamma statistics, physical extent, and the gridded reference dose.
+        tuple: A tuple containing the gamma map for display, gamma statistics, physical extent,
+               and the interpolated MCC dose grid for visualization.
     """
     try:
-        # Step 1: Extract reference data (from MCC file)
-        # This is the measured data, which is considered the ground truth.
+        # --- Step 1: Extract and filter reference data (MCC) ---
         mcc_dose_data = reference_handler.get_matrix_data()
         if mcc_dose_data is None:
-            raise ValueError("MCC data not found.")
+            raise ValueError("MCC data not found in reference_handler.")
 
-        valid_indices = np.where(mcc_dose_data >= 0)
-        mcc_coords_phys = np.array([reference_handler.pixel_to_physical_coord(px, py) for py, px in np.vstack(valid_indices).T])
-        mcc_dose_values = mcc_dose_data[valid_indices]
-        phys_extent = reference_handler.get_physical_extent()
+        # Get all valid (>=0) measurement points and their coordinates
+        all_valid_indices = np.where(mcc_dose_data >= 0)
+        if all_valid_indices[0].size == 0:
+            raise ValueError("No valid measurement data (>= 0) in MCC file.")
 
-        if mcc_dose_values.size == 0:
-            raise ValueError("No valid measurement data in MCC file.")
+        # Vectorized calculation of physical coordinates from pixel coordinates for clarity and robustness
+        y_pix, x_pix = all_valid_indices
+        handler = reference_handler
+        full_grid_px = x_pix + handler.crop_pixel_offset[0]
+        full_grid_py = y_pix + handler.crop_pixel_offset[1]
+        phys_x_all = (full_grid_px - handler.mcc_origin_x) * handler.mcc_spacing_x
+        phys_y_all = -(full_grid_py - handler.mcc_origin_y) * handler.mcc_spacing_y
+        # Reconstruct the (N, 2) array for griddata, which expects points as pairs
+        all_mcc_coords_phys = np.vstack((phys_x_all, phys_y_all)).T
 
-        # Step 2: Extract evaluation data (from DICOM file)
-        # This is the calculated dose from the treatment planning system.
+        all_mcc_dose_values = mcc_dose_data[all_valid_indices]
+
+        # Determine normalization dose for thresholding
+        norm_dose = np.max(all_mcc_dose_values)
+        if norm_dose == 0:
+            raise ValueError("Cannot determine normalization dose (max reference dose is zero).")
+
+        # Filter points based on the lower dose cutoff threshold
+        threshold_dose = (threshold / 100.0) * norm_dose
+        analysis_mask = all_mcc_dose_values >= threshold_dose
+
+        # --- Step 2: Extract evaluation data (DICOM) ---
         dicom_dose_grid = evaluation_handler.get_pixel_data()
         if dicom_dose_grid is None:
-            raise ValueError("DICOM data not found.")
+            raise ValueError("DICOM data not found in evaluation_handler.")
 
         dicom_phys_x_mesh, dicom_phys_y_mesh = evaluation_handler.phys_x_mesh, evaluation_handler.phys_y_mesh
-        
-        # The axes for the evaluation grid, used for both interpolation and gamma analysis.
         axes_eval_grid = (dicom_phys_y_mesh[:, 0], dicom_phys_x_mesh[0, :])
+        phys_extent = reference_handler.get_physical_extent()
 
-        # Step 3: 좌표계가 이미 정렬되었다고 가정합니다.
-        logger.info("좌표계 정렬 단계를 건너뛰고 원본 좌표를 사용합니다.")
+        # If no points are left after filtering, return early.
+        if not np.any(analysis_mask):
+            logger.warning(f"No MCC data points above the {threshold}% dose threshold ({threshold_dose:.2f} Gy). Gamma analysis will be skipped.")
+            gamma_stats = {'pass_rate': 100, 'mean': 0, 'max': 0, 'min': 0, 'total_points': 0}
+            gamma_map_for_display = np.full_like(mcc_dose_data, np.nan)
+            # Still create interpolated data for the report
+            mcc_interp_data = griddata(
+                all_mcc_coords_phys, all_mcc_dose_values,
+                (dicom_phys_x_mesh, dicom_phys_y_mesh),
+                method='linear', fill_value=0
+            )
+            return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data
 
-        # Step 4: Interpolate the sparse reference (MCC) data onto the evaluation (DICOM) grid
-        # pymedphys.gamma requires both datasets to be on grids.
-        dose_ref_gridded = griddata(
-            mcc_coords_phys,
-            mcc_dose_values,
-            (dicom_phys_x_mesh, dicom_phys_y_mesh),
-            method='linear',
-            fill_value=0
-        )
+        # These are the points that will be used in the gamma calculation
+        mcc_dose_for_gamma = all_mcc_dose_values[analysis_mask]
+        y_coords_for_gamma = phys_y_all[analysis_mask]
+        x_coords_for_gamma = phys_x_all[analysis_mask]
 
-        # Step 5: Perform gamma analysis using pymedphys
-        # Now that both reference and evaluation data are on the same grid, we can compare them.
-        gamma_grid = pymedphys.gamma(
-            axes_reference=axes_eval_grid,
-            dose_reference=dose_ref_gridded,
+        # Get the original pixel indices of the analyzed points to place results back into the map
+        original_indices_for_gamma = (all_valid_indices[0][analysis_mask], all_valid_indices[1][analysis_mask])
+
+        # --- Step 3: Perform gamma analysis using sparse reference points ---
+        # The points have already been filtered, so set lower_percent_dose_cutoff to 0.
+        gamma_values = pymedphys.gamma(
+            axes_reference=(y_coords_for_gamma, x_coords_for_gamma),
+            dose_reference=mcc_dose_for_gamma,
             axes_evaluation=axes_eval_grid,
             dose_evaluation=dicom_dose_grid,
             dose_percent_threshold=dose_percent_threshold,
             distance_mm_threshold=distance_mm_threshold,
-            lower_percent_dose_cutoff=threshold,
-            global_normalisation=np.max(mcc_dose_values) if global_normalisation else None,
+            lower_percent_dose_cutoff=0,  # Points are already filtered
+            global_normalisation=norm_dose if global_normalisation else None,
             interp_algo='scipy',
         )
 
-        # Step 6: Extract gamma values at the original MCC measurement points and calculate statistics
-        # We use 'nearest' interpolation to find the gamma value on the grid closest to each original measurement point.
-        gamma_values_at_mcc_points = griddata(
-            (dicom_phys_x_mesh.ravel(), dicom_phys_y_mesh.ravel()),
-            gamma_grid.ravel(),
-            mcc_coords_phys,
-            method='nearest'
-        )
-
+        # --- Step 4: Create gamma map and calculate statistics ---
         gamma_map_for_display = np.full_like(mcc_dose_data, np.nan)
-        gamma_map_for_display[valid_indices] = gamma_values_at_mcc_points
+        gamma_map_for_display[original_indices_for_gamma] = gamma_values
 
         gamma_stats = {}
-        valid_gamma = gamma_values_at_mcc_points[~np.isnan(gamma_values_at_mcc_points)]
+        valid_gamma = gamma_values[~np.isnan(gamma_values)]
 
         if len(valid_gamma) > 0:
             passed = valid_gamma <= 1
@@ -268,7 +231,16 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
 
         logger.info(f"Gamma analysis complete: {gamma_stats.get('total_points', 0)} points analyzed, pass rate {gamma_stats.get('pass_rate', 0):.1f}%")
 
-        return gamma_map_for_display, gamma_stats, phys_extent, dose_ref_gridded
+        # --- Step 5: Create interpolated MCC data for visualization purposes only ---
+        mcc_interp_data = griddata(
+            all_mcc_coords_phys,
+            all_mcc_dose_values,
+            (dicom_phys_x_mesh, dicom_phys_y_mesh),
+            method='linear',
+            fill_value=0
+        )
+
+        return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data
 
     except Exception as e:
         logger.error(f"Error during gamma analysis: {str(e)}")
