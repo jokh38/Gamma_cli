@@ -145,7 +145,7 @@ def main():
             reports_dir = "reports"
             os.makedirs(reports_dir, exist_ok=True)
             _, patient_id, _ = dicom_handler.get_patient_info()
-            output_filename = os.path.join(reports_dir, f"report_{patient_id}.jpg")
+            output_filename = os.path.join(reports_dir, f"report_{patient_id}_{dicom_handler.get_filename()}.jpg")
             generate_report(
                 output_filename,
                 dicom_handler,

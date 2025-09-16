@@ -11,6 +11,9 @@ __pycache__/
 # Logs
 logs/
 
+# csv exports
+csv_exports/
+
 # Backup
 bk/
 
