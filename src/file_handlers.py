@@ -232,9 +232,11 @@ class DicomFileHandler(BaseFileHandler):
     def physical_to_pixel_coord(self, phys_x, phys_y):
         full_grid_px = phys_x / self.pixel_spacing - self.dicom_origin_x
         full_grid_py = phys_y / self.pixel_spacing - self.dicom_origin_y
-        
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
+
+        # cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
+        # cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
         
         return cropped_px, cropped_py
     
@@ -363,13 +365,13 @@ class MCCFileHandler(BaseFileHandler):
 
     def _set_device_parameters(self):
         if self.device_type == 2:  # 1500
-            self.mcc_origin_x = 26
-            self.mcc_origin_y = 26
+            self.mcc_origin_x = 26  # 0-based index
+            self.mcc_origin_y = 26  # 0-based index
             self.mcc_spacing_x = 5.0
             self.mcc_spacing_y = 5.0
         else:  # 725
-            self.mcc_origin_x = 13
-            self.mcc_origin_y = 13
+            self.mcc_origin_x = 13  # 0-based index
+            self.mcc_origin_y = 13  # 0-based index
             self.mcc_spacing_x = 10.0
             self.mcc_spacing_y = 10.0
     
@@ -444,8 +446,8 @@ class MCCFileHandler(BaseFileHandler):
     def create_physical_coordinates_mcc(self):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
-        phys_x = (np.arange(width) - self.mcc_origin_x + 1) * self.mcc_spacing_x
-        phys_y = -(np.arange(height) - self.mcc_origin_y + 1) * self.mcc_spacing_y  # y축 반전
+        phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
+        phys_y = -(np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y  # y축 반전
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
