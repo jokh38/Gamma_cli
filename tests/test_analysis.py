@@ -28,7 +28,7 @@ class TestGammaAnalysis(unittest.TestCase):
         """
         Test the perform_gamma_analysis function with example data.
         """
-        gamma_map, gamma_stats, phys_extent, _ = perform_gamma_analysis(
+        gamma_map, gamma_stats, phys_extent, _, dd_map, dta_map, dd_stats, dta_stats = perform_gamma_analysis(
             reference_handler=self.mcc_handler,
             evaluation_handler=self.dicom_handler,
             dose_percent_threshold=3,
@@ -39,6 +39,10 @@ class TestGammaAnalysis(unittest.TestCase):
         self.assertIsNotNone(gamma_map)
         self.assertIsNotNone(gamma_stats)
         self.assertIsNotNone(phys_extent)
+        self.assertIsNotNone(dd_map)
+        self.assertIsNotNone(dta_map)
+        self.assertIsNotNone(dd_stats)
+        self.assertIsNotNone(dta_stats)
 
         # Check the statistics
         self.assertIn('pass_rate', gamma_stats)
@@ -54,6 +58,21 @@ class TestGammaAnalysis(unittest.TestCase):
 
         # Check that the number of points is greater than 0
         self.assertGreater(gamma_stats['total_points'], 0)
+
+        # Check the DD statistics
+        self.assertIn('mean', dd_stats)
+        self.assertIn('max', dd_stats)
+        self.assertIn('min', dd_stats)
+        self.assertIn('std', dd_stats)
+        self.assertIn('total_points', dd_stats)
+
+        # Check the DTA statistics
+        self.assertIn('mean', dta_stats)
+        self.assertIn('max', dta_stats)
+        self.assertIn('min', dta_stats)
+        self.assertIn('std', dta_stats)
+        self.assertIn('total_points', dta_stats)
+
 
 if __name__ == '__main__':
     unittest.main()

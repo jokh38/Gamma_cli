@@ -293,7 +293,6 @@ class MCCFileHandler(BaseFileHandler):
             
             self._set_device_parameters()
             self.create_physical_coordinates()
-            self._save_matrix_to_csv()
             
             logger.info(f"MCC 파일 로드 완료: {self.get_device_name()}")
             return True
@@ -302,37 +301,6 @@ class MCCFileHandler(BaseFileHandler):
             error_msg = f"File open error: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
-
-    def _save_matrix_to_csv(self):
-        """Saves the extracted MCC matrix data with physical coordinates to a CSV file."""
-        if self.matrix_data is None or self.phys_x_mesh is None or self.phys_y_mesh is None:
-            logger.warning("Cannot save MCC matrix to CSV, data is not available.")
-            return
-
-        try:
-            # Define output filename
-            csv_filename = os.path.splitext(self.filename)[0] + "_matrix.csv"
-
-            # Get coordinates
-            phys_x_coords = self.phys_x_mesh[0, :]
-            phys_y_coords = self.phys_y_mesh[:, 0]
-            height, _ = self.matrix_data.shape
-
-            with open(csv_filename, 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                
-                # Write header row (x-coordinates)
-                header = ['y_mm \\ x_mm'] + list(phys_x_coords)
-                writer.writerow(header)
-                
-                # Write data rows (y-coordinate + data)
-                for i in range(height):
-                    row = [phys_y_coords[i]] + list(self.matrix_data[i, :])
-                    writer.writerow(row)
-
-            logger.info(f"MCC matrix data saved to {csv_filename}")
-        except Exception as e:
-            logger.error(f"Failed to save MCC matrix to CSV: {e}", exc_info=True)
 
     def crop_to_bounds(self, bounds):
         """

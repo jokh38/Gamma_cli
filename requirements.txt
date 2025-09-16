@@ -2,5 +2,5 @@ numpy
 matplotlib
 pydicom
 scipy
-pymedphys
 pylinac
+pyyaml

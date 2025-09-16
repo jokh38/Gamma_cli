@@ -8,9 +8,9 @@ A command-line tool for performing 2D Gamma Analysis on DICOM RT dose files and 
 - numpy
 - matplotlib
 - pydicom
-- pymedphys
 - pyyaml
 - pylinac
+- scipy
 
 You can install the dependencies using pip:
 ```bash
@@ -62,7 +62,7 @@ The tool will print the gamma analysis results to the console and save a report 
 - numpy (1.21.0): Used for array operations and calculations.
 - matplotlib (3.5.1): Used for visualization and plotting.
 - pydicom (2.3.0): Used for loading and handling DICOM files.
-- pymedphys (0.36.0): Used for gamma analysis calculations.
+- scipy (1.7.0): Used for interpolation and mathematical functions.
 - pylinac (3.7.0): Used for additional DICOM image handling.
 
 ## Log Files

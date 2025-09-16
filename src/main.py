@@ -9,7 +9,7 @@ import os
 from file_handlers import DicomFileHandler, MCCFileHandler
 from analysis import perform_gamma_analysis, extract_profile_data
 from reporting import generate_report
-from utils import logger
+from utils import logger, save_map_to_csv
 
 def main():
     """Main function to run the gamma analysis from the command line."""
@@ -55,12 +55,38 @@ def main():
         mcc_handler.crop_to_bounds(dicom_handler.dose_bounds)
         logger.info("Applied DICOM bounds to MCC data.")
 
+    # Save ROI data to CSV in a dedicated directory
+    csv_dir = "csv_exports"
+    os.makedirs(csv_dir, exist_ok=True)
+
+    # Save DICOM ROI data
+    dicom_basename = os.path.splitext(os.path.basename(args.rtplan))[0]
+    dicom_csv_path = os.path.join(csv_dir, f"{dicom_basename}_dicom_roi.csv")
+    save_map_to_csv(
+        dicom_handler.get_pixel_data(),
+        dicom_handler.phys_x_mesh,
+        dicom_handler.phys_y_mesh,
+        dicom_csv_path
+    )
+
+    # Save MCC ROI data
+    mcc_basename = os.path.splitext(os.path.basename(args.measure))[0]
+    mcc_csv_path = os.path.join(csv_dir, f"{mcc_basename}_mcc_roi.csv")
+    save_map_to_csv(
+        mcc_handler.get_pixel_data(),
+        mcc_handler.phys_x_mesh,
+        mcc_handler.phys_y_mesh,
+        mcc_csv_path
+    )
+
     # Perform gamma analysis
     try:
-        gamma_map, gamma_stats, phys_extent, mcc_interp_data = perform_gamma_analysis(
+        gamma_map, gamma_stats, phys_extent, mcc_interp_data, dd_map, dta_map, dd_stats, dta_stats = perform_gamma_analysis(
             mcc_handler, dicom_handler,
             dd, dta,
-            global_normalisation=True  # Assuming global gamma, can be made configurable
+            global_normalisation=True,  # Assuming global gamma, can be made configurable
+            threshold=suppression_level,
+            max_gamma=None
         )
 
         if 'pass_rate' in gamma_stats:
@@ -71,7 +97,7 @@ def main():
             print(f"  Min Gamma: {gamma_stats['min']:.3f}")
             print(f"  Total Points: {gamma_stats['total_points']}")
 
-            # Generate profile data for the report
+            # Generate profile data for the report (center and shifted profiles)
             ver_profile_data = extract_profile_data(
                 direction="vertical",
                 fixed_position=0,
@@ -81,6 +107,32 @@ def main():
             hor_profile_data = extract_profile_data(
                 direction="horizontal",
                 fixed_position=0,
+                dicom_handler=dicom_handler,
+                mcc_handler=mcc_handler
+            )
+            
+            # Additional profiles shifted by ±1cm
+            ver_profile_data_plus1 = extract_profile_data(
+                direction="vertical",
+                fixed_position=10,  # +1cm in mm
+                dicom_handler=dicom_handler,
+                mcc_handler=mcc_handler
+            )
+            ver_profile_data_minus1 = extract_profile_data(
+                direction="vertical",
+                fixed_position=-10,  # -1cm in mm
+                dicom_handler=dicom_handler,
+                mcc_handler=mcc_handler
+            )
+            hor_profile_data_plus1 = extract_profile_data(
+                direction="horizontal",
+                fixed_position=10,  # +1cm in mm
+                dicom_handler=dicom_handler,
+                mcc_handler=mcc_handler
+            )
+            hor_profile_data_minus1 = extract_profile_data(
+                direction="horizontal",
+                fixed_position=-10,  # -1cm in mm
                 dicom_handler=dicom_handler,
                 mcc_handler=mcc_handler
             )
@@ -101,7 +153,17 @@ def main():
                 suppression_level,
                 ver_profile_data,
                 hor_profile_data,
-                mcc_interp_data=mcc_interp_data
+                mcc_interp_data=mcc_interp_data,
+                dd_map=dd_map,
+                dta_map=dta_map,
+                dd_stats=dd_stats,
+                dta_stats=dta_stats,
+                additional_profiles={
+                    'ver_plus1': ver_profile_data_plus1,
+                    'ver_minus1': ver_profile_data_minus1,
+                    'hor_plus1': hor_profile_data_plus1,
+                    'hor_minus1': hor_profile_data_minus1
+                }
             )
             logger.info(f"Report saved to {output_filename}")
 
