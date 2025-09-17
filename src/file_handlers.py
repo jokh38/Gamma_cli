@@ -218,7 +218,7 @@ class DicomFileHandler(BaseFileHandler):
                 self.phys_x_mesh = full_phys_x_mesh[min_py:max_py, min_px:max_px]
                 self.phys_y_mesh = full_phys_y_mesh[min_py:max_py, min_px:max_px]
                 self.crop_pixel_offset = (min_px, min_py)
-                self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.min(), self.phys_y_mesh.max()]
+                self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.max(), self.phys_y_mesh.min()]
                 logger.info(f"DICOM data has been cropped to ROI. New shape: {self.pixel_data.shape}")
             
             return True
@@ -271,7 +271,7 @@ class DicomFileHandler(BaseFileHandler):
         phys_x = (np.arange(width) + self.dicom_origin_x) * self.pixel_spacing
         phys_y = (np.arange(height) + self.dicom_origin_y) * self.pixel_spacing
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
-        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
+        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.max(), phys_y.min()]
 
 
 class MCCFileHandler(BaseFileHandler):
@@ -359,7 +359,7 @@ class MCCFileHandler(BaseFileHandler):
         self.phys_x_mesh = full_phys_x_mesh[min_py:max_py, min_px:max_px]
         self.phys_y_mesh = full_phys_y_mesh[min_py:max_py, min_px:max_px]
         self.crop_pixel_offset = (min_px, min_py)
-        self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.min(), self.phys_y_mesh.max()]
+        self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.max(), self.phys_y_mesh.min()]
         
         logger.info(f"MCC data has been cropped to DICOM ROI. New shape: {self.matrix_data.shape}")
 
@@ -447,23 +447,23 @@ class MCCFileHandler(BaseFileHandler):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
         phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = -(np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y  # y축 반전
+        phys_y = (np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
-        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
+        self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.max(), phys_y.min()]
             
     def physical_to_pixel_coord(self, phys_x, phys_y):
         full_grid_px = phys_x / self.mcc_spacing_x + self.mcc_origin_x
-        full_grid_py = -(phys_y / self.mcc_spacing_y) + self.mcc_origin_y
-        
+        full_grid_py = phys_y / self.mcc_spacing_y + self.mcc_origin_y
+
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
-        
+
         return cropped_px, cropped_py
     
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
         full_grid_px = pixel_x + self.crop_pixel_offset[0]
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
-        
+
         phys_x = (full_grid_px - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = -(full_grid_py - self.mcc_origin_y) * self.mcc_spacing_y
+        phys_y = (full_grid_py - self.mcc_origin_y) * self.mcc_spacing_y
         return phys_x, phys_y
