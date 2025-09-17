@@ -12,10 +12,10 @@ log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
-# 로그 파일 설정 (일별 로그 파일)
+# Log file setup (daily log file)
 log_file = os.path.join(log_dir, f'gamma_analysis_{datetime.now().strftime("%Y%m%d")}.log')
 
-# 로거 설정
+# Logger setup
 def setup_logger(name):
     """Sets up a logger for the application.
 
@@ -28,16 +28,16 @@ def setup_logger(name):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     
-    # 이미 핸들러가 추가되어 있다면 추가하지 않음
+    # If handlers are already added, do not add them again
     if not logger.handlers:
-        # 파일 핸들러
+        # File handler
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.INFO)
         file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(file_format)
         logger.addHandler(file_handler)
         
-        # 콘솔 핸들러
+        # Console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(file_format)
@@ -45,7 +45,7 @@ def setup_logger(name):
     
     return logger
 
-# 기본 로거 생성
+# Create a default logger
 logger = setup_logger('gamma_analysis')
 
 def find_nearest_index(array, value):

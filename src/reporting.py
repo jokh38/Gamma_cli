@@ -23,7 +23,34 @@ def generate_report(
     dta_stats=None,
     additional_profiles=None
 ):
-    """Generates a report with all the analysis information."""
+    """
+    Generates a comprehensive PDF report of the gamma analysis results.
+
+    The report includes:
+    - Patient and file information.
+    - 2D dose distribution plots for both DICOM and MCC data.
+    - Dose profile comparisons (horizontal and vertical).
+    - A 2D gamma map, with statistics.
+    - Dose Difference (DD) and Distance-to-Agreement (DTA) maps.
+
+    Args:
+        output_path (str): The path to save the generated report file.
+        dicom_handler (DicomFileHandler): The handler for the DICOM data.
+        mcc_handler (MCCFileHandler): The handler for the MCC data.
+        gamma_map (np.ndarray): The calculated gamma map.
+        gamma_stats (dict): A dictionary of statistics for the gamma analysis.
+        dta (float): The Distance-to-Agreement criterion used (in mm).
+        dd (float): The Dose Difference criterion used (in %).
+        suppression_level (float): The dose threshold for the analysis (in %).
+        ver_profile_data (dict): Data for the vertical dose profile.
+        hor_profile_data (dict): Data for the horizontal dose profile.
+        mcc_interp_data (np.ndarray, optional): Interpolated MCC data. Defaults to None.
+        dd_map (np.ndarray, optional): The dose difference map. Defaults to None.
+        dta_map (np.ndarray, optional): The distance-to-agreement map. Defaults to None.
+        dd_stats (dict, optional): Statistics for the dose difference analysis. Defaults to None.
+        dta_stats (dict, optional): Statistics for the distance-to-agreement analysis. Defaults to None.
+        additional_profiles (dict, optional): Data for additional dose profiles. Defaults to None.
+    """
     fig = plt.figure(figsize=(12, 24))
     gs = fig.add_gridspec(4, 2, height_ratios=[1, 1, 1, 1])
 

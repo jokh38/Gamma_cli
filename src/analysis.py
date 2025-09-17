@@ -116,21 +116,29 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
                            global_normalisation=True, threshold=10, max_gamma=None,
                            save_csv=False, csv_dir=None):
     """
-    보간(interpolation) 없이 sparse한 기준점(MCC)과 dense한 평가 그리드(DICOM)
-    사이에 감마 인덱스를 직접 계산합니다.
+    Performs gamma index analysis directly between sparse reference points (MCC)
+    and a dense evaluation grid (DICOM) without interpolation.
 
     Args:
-        reference_handler: 기준 데이터 핸들러 (MCC)
-        evaluation_handler: 평가 데이터 핸들러 (DICOM)
-        dose_percent_threshold (float): 선량 차이 기준 (%)
-        distance_mm_threshold (float): 거리 기준 (mm)
-        global_normalisation (bool): 전역 정규화 사용 여부
-        threshold (int): 분석에 포함할 최소 선량 임계값 (%)
-        save_csv (bool): 분석 맵을 CSV로 저장할지 여부
-        csv_dir (str): CSV 파일을 저장할 디렉토리
+        reference_handler: Handler for the reference data (MCC).
+        evaluation_handler: Handler for the evaluation data (DICOM).
+        dose_percent_threshold (float): Dose difference criterion (%).
+        distance_mm_threshold (float): Distance-to-agreement criterion (mm).
+        global_normalisation (bool): Whether to use global normalization.
+        threshold (int): The lower dose threshold for including points in the analysis (%).
+        save_csv (bool): Whether to save the analysis maps to CSV files.
+        csv_dir (str): The directory to save the CSV files in.
 
     Returns:
-        tuple: (감마 맵, 감마 통계, 물리적 범위, MCC 보간 데이터(시각화용), DD 맵, DTA 맵, DD 통계, DTA 통계)
+        tuple: A tuple containing:
+            - gamma_map (np.ndarray): The gamma map.
+            - gamma_stats (dict): Statistics of the gamma analysis.
+            - phys_extent (list): The physical extent of the analysis.
+            - mcc_interp_data (np.ndarray): Interpolated MCC data for visualization.
+            - dd_map (np.ndarray): The dose difference map.
+            - dta_map (np.ndarray): The distance-to-agreement map.
+            - dd_stats (dict): Statistics of the dose difference analysis.
+            - dta_stats (dict): Statistics of the distance-to-agreement analysis.
     """
     try:
         # --- Step 1: Extract and filter reference data (MCC) ---

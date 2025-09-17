@@ -15,6 +15,7 @@ from utils import logger
 class BaseFileHandler:
     """Base class for various file handlers."""
     def __init__(self):
+        """Initializes the BaseFileHandler and loads configuration from config.yaml."""
         self.filename = None
         self.pixel_data = None
         self.phys_x_mesh = None
@@ -81,6 +82,16 @@ class BaseFileHandler:
         raise NotImplementedError("Must be implemented in subclass")
 
     def _calculate_bounds_from_mask(self, mask, margin_mm=0):
+        """
+        Calculates the bounding box in physical coordinates from a boolean mask.
+
+        Args:
+            mask (np.ndarray): A boolean array where True indicates a region of interest.
+            margin_mm (int, optional): A margin in millimeters to add to the bounding box. Defaults to 0.
+
+        Returns:
+            dict: A dictionary containing the min/max physical coordinates of the bounding box.
+        """
         if not np.any(mask):
             return None
 
@@ -93,12 +104,12 @@ class BaseFileHandler:
         min_row, max_row = row_indices[0], row_indices[-1]
         min_col, max_col = col_indices[0], col_indices[-1]
 
-        logger.info(f"선량 영역 픽셀 경계: row=({min_row}, {max_row}), col=({min_col}, {max_col})")
+        logger.info(f"Dose area pixel bounds: row=({min_row}, {max_row}), col=({min_col}, {max_col})")
 
         min_phys_x, min_phys_y = self.pixel_to_physical_coord(min_col, min_row)
         max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
 
-        logger.info(f"픽셀 경계의 물리적 좌표 (여백 적용 전): min=({min_phys_x:.2f}, {min_phys_y:.2f}), max=({max_phys_x:.2f}, {max_phys_y:.2f})")
+        logger.info(f"Physical coordinates of pixel bounds (before margin): min=({min_phys_x:.2f}, {min_phys_y:.2f}), max=({max_phys_x:.2f}, {max_phys_y:.2f})")
 
         if margin_mm > 0:
             min_phys_x -= margin_mm
@@ -110,7 +121,7 @@ class BaseFileHandler:
             'min_x': min_phys_x, 'max_x': max_phys_x,
             'min_y': min_phys_y, 'max_y': max_phys_y
         }
-        logger.info(f"계산된 선량 경계 (물리적 좌표, {margin_mm}mm 여백 포함): {bounds}")
+        logger.info(f"Calculated dose bounds (physical coords, {margin_mm}mm margin included): {bounds}")
         return bounds
 
     def calculate_dose_bounds(self, image_data=None, threshold_percent=0, margin_mm=0):
@@ -141,11 +152,20 @@ class BaseFileHandler:
         return self._calculate_bounds_from_mask(mask, margin_mm)
         
     def open_file(self, filename):
-        """Loads a file (abstract method)."""
+        """
+        Loads a file (abstract method).
+
+        Args:
+            filename (str): The path to the file to load.
+
+        Returns:
+            tuple: A tuple containing a boolean success flag and an error message string.
+                   (True, None) on success, (False, "error message") on failure.
+        """
         try:
             self.filename = filename
             # File loading logic (to be implemented in subclasses)
-            return True
+            return True, None
         except Exception as e:
             error_msg = f"File loading error: {str(e)}"
             logger.error(error_msg)
@@ -155,6 +175,7 @@ class BaseFileHandler:
 class DicomFileHandler(BaseFileHandler):
     """Class for handling DICOM RT dose files."""
     def __init__(self):
+        """Initializes the DicomFileHandler."""
         super().__init__()
         self.dicom_data = None
         self.dicom_origin_x = 0
@@ -162,7 +183,19 @@ class DicomFileHandler(BaseFileHandler):
         self.pixel_spacing = 1.0
         
     def open_file(self, filename):
-        """Loads a DICOM RT dose file."""
+        """
+        Loads and processes a DICOM RT dose file.
+
+        This method reads a DICOM file, extracts dose and patient information,
+        and automatically crops the data to the region of interest based on dose levels.
+
+        Args:
+            filename (str): The path to the DICOM file.
+
+        Returns:
+            tuple: A tuple containing a boolean success flag and an error message string.
+                   (True, None) on success, (False, "error message") on failure.
+        """
         try:
             self.filename = filename
             self.dicom_data = pydicom.dcmread(filename)
@@ -179,26 +212,27 @@ class DicomFileHandler(BaseFileHandler):
             
             if hasattr(self.dicom_data, 'ImagePositionPatient'):
                 # ImagePositionPatient: [x, z, y]
-                # 물리적 위치를 픽셀 간격으로 나누어 픽셀 원점 계산
+                # Calculate pixel origin by dividing physical position by pixel spacing
                 self.dicom_origin_x = int(round(self.dicom_data.ImagePositionPatient[0] / self.pixel_spacing))
-                self.dicom_origin_y = int(round(self.dicom_data.ImagePositionPatient[2] / self.pixel_spacing)) # y좌표는 index 2
+                self.dicom_origin_y = int(round(self.dicom_data.ImagePositionPatient[2] / self.pixel_spacing)) # y-coordinate is at index 2
                 
-                logger.info(f"DICOM 픽셀 원점 설정 (from ImagePositionPatient): x={self.dicom_origin_x}, y={self.dicom_origin_y}")
-                logger.info(f"사용된 ImagePositionPatient 값: x={self.dicom_data.ImagePositionPatient[0]}, y={self.dicom_data.ImagePositionPatient[2]}")
-                logger.info(f"사용된 PixelSpacing 값: {self.pixel_spacing}")
+                logger.info(f"DICOM pixel origin set (from ImagePositionPatient): x={self.dicom_origin_x}, y={self.dicom_origin_y}")
+                logger.info(f"Used ImagePositionPatient values: x={self.dicom_data.ImagePositionPatient[0]}, y={self.dicom_data.ImagePositionPatient[2]}")
+                logger.info(f"Used PixelSpacing value: {self.pixel_spacing}")
             else:
                 self.dicom_origin_x = -width // 2
                 self.dicom_origin_y = -height // 2
-                logger.warning(f"DICOM 원점 정보 없음. 이미지 중심으로 기본값 설정: ({self.dicom_origin_x}, {self.dicom_origin_y})")
+                logger.warning(f"DICOM origin info not found. Defaulting to image center: ({self.dicom_origin_x}, {self.dicom_origin_y})")
                 
             self.create_physical_coordinates_dcm()
 
-            # 원본 데이터 및 좌표 보존
+            # Preserve original data and coordinates
             full_pixel_data = self.pixel_data
             full_phys_x_mesh = self.phys_x_mesh
             full_phys_y_mesh = self.phys_y_mesh
 
-            self.dose_bounds = self.calculate_dose_bounds(threshold_percent=1, margin_mm=self.roi_margin) # 최대 선량의 1% 이상 영역 + 2cm 여백으로 ROI 자동 크롭
+            # Auto-crop ROI to area with >1% of max dose + 2cm margin
+            self.dose_bounds = self.calculate_dose_bounds(threshold_percent=1, margin_mm=self.roi_margin)
 
             if self.dose_bounds:
                 bounds = self.dose_bounds
@@ -221,26 +255,25 @@ class DicomFileHandler(BaseFileHandler):
                 self.physical_extent = [self.phys_x_mesh.min(), self.phys_x_mesh.max(), self.phys_y_mesh.max(), self.phys_y_mesh.min()]
                 logger.info(f"DICOM data has been cropped to ROI. New shape: {self.pixel_data.shape}")
             
-            return True
+            return True, None
             
         except Exception as e:
-            error_msg = f"DICOM 파일 로드 오류: {e}"
+            error_msg = f"DICOM file loading error: {e}"
             logger.error(error_msg)
             return False, error_msg
 
 
     def physical_to_pixel_coord(self, phys_x, phys_y):
+        """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.pixel_spacing - self.dicom_origin_x
         full_grid_py = phys_y / self.pixel_spacing - self.dicom_origin_y
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
-
-        # cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
-        # cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
         
         return cropped_px, cropped_py
     
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
+        """Converts cropped pixel coordinates to physical coordinates (mm)."""
         full_grid_px = pixel_x + self.crop_pixel_offset[0]
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
         
@@ -249,9 +282,11 @@ class DicomFileHandler(BaseFileHandler):
         return phys_x, phys_y
 
     def get_origin_coords(self):
+        """Returns the DICOM origin coordinates in pixels."""
         return self.dicom_origin_x, self.dicom_origin_y
 
     def get_spacing(self):
+        """Returns the DICOM pixel spacing in mm."""
         return self.pixel_spacing, self.pixel_spacing
 
     def get_patient_info(self):
@@ -266,6 +301,7 @@ class DicomFileHandler(BaseFileHandler):
         return institution, patient_id, patient_name
 
     def create_physical_coordinates_dcm(self):
+        """Creates physical coordinate meshes based on DICOM metadata."""
         if self.pixel_data is None: return
         height, width = self.pixel_data.shape
         phys_x = (np.arange(width) + self.dicom_origin_x) * self.pixel_spacing
@@ -277,6 +313,7 @@ class DicomFileHandler(BaseFileHandler):
 class MCCFileHandler(BaseFileHandler):
     """Class for handling MCC files."""
     def __init__(self):
+        """Initializes the MCCFileHandler."""
         super().__init__()
         self.matrix_data = None
         self.device_type = None
@@ -288,9 +325,19 @@ class MCCFileHandler(BaseFileHandler):
         self.mcc_spacing_y = 1.0
                 
     def get_matrix_data(self):
+        """Returns the raw MCC matrix data."""
         return self.matrix_data
 
     def get_interpolated_matrix_data(self, method='cubic'):
+        """
+        Returns interpolated MCC matrix data.
+
+        Args:
+            method (str, optional): The interpolation method to use ('linear', 'cubic', etc.). Defaults to 'cubic'.
+
+        Returns:
+            np.ndarray: The interpolated data, or the original data if interpolation is not possible.
+        """
         if self.matrix_data is None: return None
         data = self.matrix_data.copy()
         data[data < 0] = np.nan
@@ -306,6 +353,19 @@ class MCCFileHandler(BaseFileHandler):
         return interpolated_data        
     
     def open_file(self, filename):
+        """
+        Loads and processes an MCC file.
+
+        This method reads an MCC file, detects the device type, extracts the dose
+        matrix, and sets up the physical coordinate system.
+
+        Args:
+            filename (str): The path to the MCC file.
+
+        Returns:
+            tuple: A tuple containing a boolean success flag and an error message string.
+                   (True, None) on success, (False, "error message") on failure.
+        """
         try:
             self.filename = filename
             with open(filename, "r") as file:
@@ -322,8 +382,8 @@ class MCCFileHandler(BaseFileHandler):
             self._set_device_parameters()
             self.create_physical_coordinates_mcc()
             
-            logger.info(f"MCC 파일 로드 완료: {self.get_device_name()}")
-            return True
+            logger.info(f"MCC file loaded successfully: {self.get_device_name()}")
+            return True, None
                         
         except Exception as e:
             error_msg = f"File open error: {str(e)}"
@@ -364,6 +424,7 @@ class MCCFileHandler(BaseFileHandler):
         logger.info(f"MCC data has been cropped to DICOM ROI. New shape: {self.matrix_data.shape}")
 
     def _set_device_parameters(self):
+        """Sets the origin and spacing parameters based on the detected device type."""
         if self.device_type == 2:  # 1500
             self.mcc_origin_x = 26  # 0-based index
             self.mcc_origin_y = 26  # 0-based index
@@ -376,6 +437,18 @@ class MCCFileHandler(BaseFileHandler):
             self.mcc_spacing_y = 10.0
     
     def extract_data(self, lines, N_begin, device_type, task_type):
+        """
+        Extracts the dose matrix from the lines of an MCC file.
+
+        Args:
+            lines (list): The lines of the MCC file.
+            N_begin (int): The number of data blocks (rows).
+            device_type (int): The type of the device (1 for 725, 2 for 1500).
+            task_type (int): The type of task (1 for non-merged, 2 for merged).
+
+        Returns:
+            np.ndarray: The extracted dose matrix.
+        """
         try:
             scan_data_blocks = []
             in_data_block = False
@@ -425,6 +498,15 @@ class MCCFileHandler(BaseFileHandler):
             raise
         
     def detect_device_type(self, content):
+        """
+        Detects the device type and task type from the MCC file content.
+
+        Args:
+            content (str): The content of the MCC file.
+
+        Returns:
+            tuple: A tuple containing the device type (int) and task type (int).
+        """
         try:
             is_1500 = "SCAN_DEVICE=OCTAVIUS_1500_XDR" in content
             is_merged = "SCAN_OFFAXIS_CROSSPLANE=0.00" in content
@@ -434,16 +516,20 @@ class MCCFileHandler(BaseFileHandler):
             raise
 
     def get_device_name(self):
+        """Returns the name of the detected device."""
         if self.device_type == 2: return "OCTAVIUS 1500" + (" with merge" if self.task_type == 2 else "")
         else: return "OCTAVIUS 725" + (" with merge" if self.task_type == 2 else "")
                 
     def get_origin_coords(self):
+        """Returns the MCC origin coordinates in pixels."""
         return self.mcc_origin_x, self.mcc_origin_y
             
     def get_spacing(self):
+        """Returns the MCC pixel spacing in mm."""
         return self.mcc_spacing_x, self.mcc_spacing_y
 
     def create_physical_coordinates_mcc(self):
+        """Creates physical coordinate meshes for the MCC data."""
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
         phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
@@ -452,6 +538,7 @@ class MCCFileHandler(BaseFileHandler):
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.max(), phys_y.min()]
             
     def physical_to_pixel_coord(self, phys_x, phys_y):
+        """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.mcc_spacing_x + self.mcc_origin_x
         full_grid_py = phys_y / self.mcc_spacing_y + self.mcc_origin_y
 
@@ -461,6 +548,7 @@ class MCCFileHandler(BaseFileHandler):
         return cropped_px, cropped_py
     
     def pixel_to_physical_coord(self, pixel_x, pixel_y):
+        """Converts cropped pixel coordinates to physical coordinates (mm)."""
         full_grid_px = pixel_x + self.crop_pixel_offset[0]
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
 
