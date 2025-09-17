@@ -113,19 +113,19 @@ def generate_report(
         ax_ver_profile.set_title('In-Out Profile (Vertical)')
         ax_ver_profile.legend()
         ax_ver_profile.grid(True)
+        ax_ver_profile.invert_xaxis()
 
     # 3. Gamma Analysis
     # Gamma Map
     ax_gamma = fig.add_subplot(gs[2, 0])
     mcc_extent = mcc_handler.get_physical_extent()
     if gamma_map is not None and mcc_extent is not None:
-        # Use origin='upper' to align the array's top row with the maximum y-coordinate.
-        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
+        # Flip gamma_map vertically and use origin='lower' to align with other dose distributions
+        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='lower')
         fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index')
     ax_gamma.set_title(f'Gamma Analysis (Pass: {gamma_stats.get("pass_rate", 0):.1f}%)')
     ax_gamma.set_xlabel('Position (mm)')
     ax_gamma.set_ylabel('Position (mm)')
-
 
     # Gamma Stats Text
     ax_gamma_text = fig.add_subplot(gs[2, 1])
@@ -181,8 +181,8 @@ def generate_report(
         # DD Map (Dose Difference)
         ax_dd = fig.add_subplot(gs[3, 0])
         if mcc_extent is not None:
-            im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
-            fig.colorbar(im_dd, ax=ax_dd, label='DD (%)')
+            im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='lower')
+            fig.colorbar(im_dd, ax=ax_dd, label='DD')
         ax_dd.set_title(f'Dose Difference (DD) Map')
         ax_dd.set_xlabel('Position (mm)')
         ax_dd.set_ylabel('Position (mm)')
@@ -190,8 +190,8 @@ def generate_report(
         # DTA Map (Distance to Agreement)
         ax_dta = fig.add_subplot(gs[3, 1])
         if mcc_extent is not None:
-            im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
-            fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)')
+            im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='lower')
+            fig.colorbar(im_dta, ax=ax_dta, label='DTA')
         ax_dta.set_title(f'Distance to Agreement (DTA) Map')
         ax_dta.set_xlabel('Position (mm)')
         ax_dta.set_ylabel('Position (mm)')
