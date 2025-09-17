@@ -12,6 +12,7 @@ from analysis import perform_gamma_analysis
 from file_handlers import DicomFileHandler, MCCFileHandler
 
 class TestGammaAnalysis(unittest.TestCase):
+    """Test suite for the gamma analysis functions."""
 
     def setUp(self):
         """Set up the test case by loading the data files."""
