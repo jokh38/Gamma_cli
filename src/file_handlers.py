@@ -106,8 +106,15 @@ class BaseFileHandler:
 
         logger.info(f"Dose area pixel bounds: row=({min_row}, {max_row}), col=({min_col}, {max_col})")
 
-        min_phys_x, min_phys_y = self.pixel_to_physical_coord(min_col, min_row)
-        max_phys_x, max_phys_y = self.pixel_to_physical_coord(max_col, max_row)
+        # The y-axis is inverted in physical space relative to pixel space.
+        # min_row (top of image) corresponds to max physical y.
+        # max_row (bottom of image) corresponds to min physical y.
+        min_phys_x, phys_y_for_min_row = self.pixel_to_physical_coord(min_col, min_row)
+        max_phys_x, phys_y_for_max_row = self.pixel_to_physical_coord(max_col, max_row)
+
+        # Ensure min_phys_y is always less than max_phys_y for consistency
+        min_phys_y = min(phys_y_for_min_row, phys_y_for_max_row)
+        max_phys_y = max(phys_y_for_min_row, phys_y_for_max_row)
 
         logger.info(f"Physical coordinates of pixel bounds (before margin): min=({min_phys_x:.2f}, {min_phys_y:.2f}), max=({max_phys_x:.2f}, {max_phys_y:.2f})")
 
@@ -236,11 +243,16 @@ class DicomFileHandler(BaseFileHandler):
 
             if self.dose_bounds:
                 bounds = self.dose_bounds
-                min_px = int(round(bounds['min_x'] / self.pixel_spacing - self.dicom_origin_x))
-                max_px = int(round(bounds['max_x'] / self.pixel_spacing - self.dicom_origin_x))
-                min_py = int(round(bounds['min_y'] / self.pixel_spacing - self.dicom_origin_y))
-                max_py = int(round(bounds['max_y'] / self.pixel_spacing - self.dicom_origin_y))
+                # Convert physical bounds back to pixel coordinates for cropping.
+                # Note: At this point, self.physical_to_pixel_coord returns full-grid pixel coordinates
+                # because self.crop_pixel_offset is (0, 0).
+                min_px, py_for_min_y = self.physical_to_pixel_coord(bounds['min_x'], bounds['min_y'])
+                max_px, py_for_max_y = self.physical_to_pixel_coord(bounds['max_x'], bounds['max_y'])
 
+                # Because of y-axis inversion, min physical y corresponds to max pixel y, so we swap.
+                min_py = py_for_max_y
+                max_py = py_for_min_y
+                
                 if min_py > max_py: min_py, max_py = max_py, min_py
                 if min_px > max_px: min_px, max_px = max_px, min_px
 
@@ -266,7 +278,7 @@ class DicomFileHandler(BaseFileHandler):
     def physical_to_pixel_coord(self, phys_x, phys_y):
         """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.pixel_spacing - self.dicom_origin_x
-        full_grid_py = -phys_y / self.pixel_spacing + self.dicom_origin_y
+        full_grid_py = -phys_y / self.pixel_spacing - self.dicom_origin_y
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
         
