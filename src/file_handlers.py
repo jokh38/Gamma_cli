@@ -402,7 +402,6 @@ class MCCFileHandler(BaseFileHandler):
         full_phys_x_mesh = self.phys_x_mesh
         full_phys_y_mesh = self.phys_y_mesh
 
-        # MCC y-axis is inverted. min_phys_y maps to max_pixel_y.
         min_px, max_py_from_min_y = self.physical_to_pixel_coord(bounds['min_x'], bounds['min_y'])
         max_px, min_py_from_max_y = self.physical_to_pixel_coord(bounds['max_x'], bounds['max_y'])
 
@@ -534,16 +533,14 @@ class MCCFileHandler(BaseFileHandler):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
         phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
-        # y축 방향을 반전시켜 DICOM 좌표계와 통일합니다.
-        phys_y = (np.arange(height) - self.mcc_origin_y) * -self.mcc_spacing_y
+        phys_y = (np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
-        # physical_extent의 y축 순서를 min, max로 표준화합니다.
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
     def physical_to_pixel_coord(self, phys_x, phys_y):
         """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.mcc_spacing_x + self.mcc_origin_x
-        full_grid_py = phys_y / -self.mcc_spacing_y + self.mcc_origin_y
+        full_grid_py = phys_y / self.mcc_spacing_y + self.mcc_origin_y
 
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
@@ -556,5 +553,5 @@ class MCCFileHandler(BaseFileHandler):
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
 
         phys_x = (full_grid_px - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = (full_grid_py - self.mcc_origin_y) * -self.mcc_spacing_y
+        phys_y = (full_grid_py - self.mcc_origin_y) * self.mcc_spacing_y
         return phys_x, phys_y
