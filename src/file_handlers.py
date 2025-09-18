@@ -220,15 +220,15 @@ class DicomFileHandler(BaseFileHandler):
             if hasattr(self.dicom_data, 'ImagePositionPatient'):
                 # ImagePositionPatient: [x, z, y]
                 # Calculate pixel origin by dividing physical position by pixel spacing
-                self.dicom_origin_x = int(round(self.dicom_data.ImagePositionPatient[0] / self.pixel_spacing))
-                self.dicom_origin_y = int(round(self.dicom_data.ImagePositionPatient[2] / self.pixel_spacing)) # y-coordinate is at index 2
+                self.dicom_origin_x = int(round(self.dicom_data.ImagePositionPatient[0] / self.pixel_spacing)) + 1
+                self.dicom_origin_y = int(round(self.dicom_data.ImagePositionPatient[2] / self.pixel_spacing)) - 1 # y-coordinate is at index 2
                 
                 logger.info(f"Used ImagePositionPatient values: x={self.dicom_data.ImagePositionPatient[0]}, y={self.dicom_data.ImagePositionPatient[2]}")
                 logger.info(f"DICOM pixel origin set (from ImagePositionPatient): x={self.dicom_origin_x}, y={self.dicom_origin_y}")
                 logger.info(f"Used PixelSpacing value: {self.pixel_spacing}")
             else:
-                self.dicom_origin_x = -width // 2
-                self.dicom_origin_y = -height // 2
+                self.dicom_origin_x = -width // 2 + 1
+                self.dicom_origin_y = -height // 2 - 1
                 logger.warning(f"DICOM origin info not found. Defaulting to image center: ({self.dicom_origin_x}, {self.dicom_origin_y})")
                 
             self.create_physical_coordinates_dcm()

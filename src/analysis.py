@@ -57,6 +57,13 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
         closest_idx_dicom = find_nearest_index(fixed_axis_coords_dicom, fixed_position)
         profile_coords_dicom = profile_axis_mesh_dicom[slicer_dicom(closest_idx_dicom)]
         dicom_values = dicom_image[slicer_dicom(closest_idx_dicom)]
+
+        # For vertical profiles, the physical y-coordinate is descending.
+        # To ensure consistency for interpolation and plotting, we make it ascending.
+        if sort_required:
+            # Reverse both arrays to sort them in ascending order of coordinates.
+            profile_coords_dicom = profile_coords_dicom[::-1]
+            dicom_values = dicom_values[::-1]
         
         profile_data['phys_coords'] = profile_coords_dicom
         profile_data['dicom_values'] = dicom_values
@@ -78,6 +85,12 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
                     mcc_phys_coords = mcc_profile_axis_mesh[closest_idx_mcc, valid_indices]
                 
                 mcc_values = mcc_line_values[valid_indices]
+
+                # For vertical profiles, the physical y-coordinate is descending.
+                # We sort it here to ensure all subsequent operations use ascending coordinates.
+                if sort_required:
+                    mcc_phys_coords = mcc_phys_coords[::-1]
+                    mcc_values = mcc_values[::-1]
                 
                 # Find corresponding DICOM values at MCC measurement points
                 dicom_at_mcc_positions = np.array([
@@ -86,17 +99,12 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
                 
                 # Interpolate MCC data for smooth plotting
                 if len(mcc_values) > 1:
-                    interp_coords = mcc_phys_coords
-                    interp_values = mcc_values
-                    if sort_required:
-                        sort_indices = np.argsort(interp_coords)
-                        interp_coords = interp_coords[sort_indices]
-                        interp_values = interp_values[sort_indices]
-                    
+                    # The coordinate arrays are now guaranteed to be ascending,
+                    # so we can interpolate directly.
                     mcc_interp = np.interp(
                         profile_coords_dicom,
-                        interp_coords,
-                        interp_values,
+                        mcc_phys_coords,
+                        mcc_values,
                         left=np.nan, right=np.nan
                     )
                     profile_data['mcc_interp'] = mcc_interp
