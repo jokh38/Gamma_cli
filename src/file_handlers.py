@@ -266,7 +266,7 @@ class DicomFileHandler(BaseFileHandler):
     def physical_to_pixel_coord(self, phys_x, phys_y):
         """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.pixel_spacing - self.dicom_origin_x
-        full_grid_py = phys_y / self.pixel_spacing - self.dicom_origin_y
+        full_grid_py = -phys_y / self.pixel_spacing + self.dicom_origin_y
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
         
@@ -278,7 +278,7 @@ class DicomFileHandler(BaseFileHandler):
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
         
         phys_x = (full_grid_px + self.dicom_origin_x) * self.pixel_spacing
-        phys_y = (full_grid_py + self.dicom_origin_y) * self.pixel_spacing
+        phys_y = (full_grid_py + self.dicom_origin_y) * -self.pixel_spacing
         return phys_x, phys_y
 
     def get_origin_coords(self):
@@ -305,7 +305,7 @@ class DicomFileHandler(BaseFileHandler):
         if self.pixel_data is None: return
         height, width = self.pixel_data.shape
         phys_x = (np.arange(width) + self.dicom_origin_x) * self.pixel_spacing
-        phys_y = (np.arange(height) + self.dicom_origin_y) * self.pixel_spacing
+        phys_y = (np.arange(height) + self.dicom_origin_y) * -self.pixel_spacing
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         # physical_extent의 y축 순서를 min, max로 표준화합니다.
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
@@ -533,14 +533,14 @@ class MCCFileHandler(BaseFileHandler):
         if self.matrix_data is None: return
         height, width = self.matrix_data.shape
         phys_x = (np.arange(width) - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = (np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y
+        phys_y = -(np.arange(height) - self.mcc_origin_y) * self.mcc_spacing_y
         self.phys_x_mesh, self.phys_y_mesh = np.meshgrid(phys_x, phys_y)
         self.physical_extent = [phys_x.min(), phys_x.max(), phys_y.min(), phys_y.max()]
             
     def physical_to_pixel_coord(self, phys_x, phys_y):
         """Converts physical coordinates (mm) to cropped pixel coordinates."""
         full_grid_px = phys_x / self.mcc_spacing_x + self.mcc_origin_x
-        full_grid_py = phys_y / self.mcc_spacing_y + self.mcc_origin_y
+        full_grid_py = -phys_y / self.mcc_spacing_y + self.mcc_origin_y
 
         cropped_px = int(round(full_grid_px - self.crop_pixel_offset[0]))
         cropped_py = int(round(full_grid_py - self.crop_pixel_offset[1]))
@@ -553,5 +553,5 @@ class MCCFileHandler(BaseFileHandler):
         full_grid_py = pixel_y + self.crop_pixel_offset[1]
 
         phys_x = (full_grid_px - self.mcc_origin_x) * self.mcc_spacing_x
-        phys_y = (full_grid_py - self.mcc_origin_y) * self.mcc_spacing_y
+        phys_y = -(full_grid_py - self.mcc_origin_y) * self.mcc_spacing_y
         return phys_x, phys_y

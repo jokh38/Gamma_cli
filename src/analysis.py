@@ -157,7 +157,7 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         full_grid_px = x_pix + handler.crop_pixel_offset[0]
         full_grid_py = y_pix + handler.crop_pixel_offset[1]
         phys_x_all = (full_grid_px - handler.mcc_origin_x) * handler.mcc_spacing_x
-        phys_y_all = -(full_grid_py - handler.mcc_origin_y) * handler.mcc_spacing_y
+        phys_y_all = (full_grid_py - handler.mcc_origin_y) * handler.mcc_spacing_y
         all_mcc_coords_phys = np.vstack((phys_x_all, phys_y_all)).T
 
         all_mcc_dose_values = mcc_dose_data[all_valid_indices]
