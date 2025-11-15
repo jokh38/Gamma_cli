@@ -1,0 +1,6 @@
+dta: 2
+dd: 2
+suppression_level: 5
+roi_margin: 5
+save_csv: false
+csv_export_path: "csv_exports"
