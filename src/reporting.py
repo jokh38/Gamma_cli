@@ -59,7 +59,7 @@ def generate_report(
     title_ax = fig.add_subplot(gs[0, :])
     title_ax.axis('off')
     title_ax.text(0.5, 0.5, f'Institution: {institution} | Patient: {patient_name} ({patient_id})',
-                 ha='center', va='center', fontsize=16)
+                 ha='center', va='center', fontsize=22, weight='bold')
 
     # 1. 2D Dose Plots
     # DICOM Dose
@@ -123,21 +123,6 @@ def generate_report(
     if gamma_map is not None and mcc_extent is not None:
         im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
         cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='horizontal', pad=0.1)
-        
-        # Add gamma statistics as text box within the plot
-        pass_rate = gamma_stats.get('pass_rate', 0)
-        total_points = gamma_stats.get('total_points', 0)
-        passed_points = int(total_points * pass_rate / 100)
-        
-        gamma_text = (
-            f"Pass Rate: {pass_rate:.1f}%\n"
-            f"Analyzed: {total_points}\n"
-            f"Passed: {passed_points}\n"
-            f"DTA: {dta}mm, DD: {dd}%"
-        )
-        
-        ax_gamma.text(0.02, 0.98, gamma_text, transform=ax_gamma.transAxes, fontsize=9,
-                     verticalalignment='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8))
     
     ax_gamma.set_title(f'Gamma Analysis (DTA: {dta}mm, DD: {dd}%)')
     ax_gamma.set_xlabel('Position (mm)')
@@ -188,8 +173,10 @@ def generate_report(
         )
     
     stats_text = results_text + dd_text + dta_text
-    ax_results.text(0.05, 0.95, stats_text, transform=ax_results.transAxes, fontsize=10,
-                   verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', fc='aliceblue', alpha=0.5))
+    ax_results.text(0.05, 0.95, stats_text, transform=ax_results.transAxes, fontsize=11,
+                   verticalalignment='top', family='monospace',
+                   bbox=dict(boxstyle='round,pad=0.7', fc='aliceblue', alpha=0.85,
+                            edgecolor='steelblue', linewidth=1.5))
 
     # 4. DD and DTA Analysis (4th row)
     if dd_map is not None and dta_map is not None:
@@ -200,18 +187,6 @@ def generate_report(
         if mcc_extent is not None:
             im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
             cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD', orientation='horizontal', pad=0.1)
-            
-            # Add DD statistics as text box within the plot
-            if dd_stats:
-                dd_text = (
-                    f"Mean: {dd_stats.get('mean', 0):.2f}\n"
-                    f"Max: {dd_stats.get('max', 0):.2f}\n"
-                    f"Min: {dd_stats.get('min', 0):.2f}\n"
-                    f"Std: {dd_stats.get('std', 0):.2f}"
-                )
-                
-                ax_dd.text(0.02, 0.98, dd_text, transform=ax_dd.transAxes, fontsize=9,
-                          verticalalignment='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8))
         
         ax_dd.set_title(f'Dose Difference (DD) Map (Threshold: {suppression_level}%)')
         ax_dd.set_xlabel('Position (mm)')
@@ -222,23 +197,11 @@ def generate_report(
         if mcc_extent is not None:
             im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
             cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA', orientation='horizontal', pad=0.1)
-            
-            # Add DTA statistics as text box within the plot
-            if dta_stats:
-                dta_text = (
-                    f"Mean: {dta_stats.get('mean', 0):.2f}\n"
-                    f"Max: {dta_stats.get('max', 0):.2f}\n"
-                    f"Min: {dta_stats.get('min', 0):.2f}\n"
-                    f"Std: {dta_stats.get('std', 0):.2f}"
-                )
-                
-                ax_dta.text(0.02, 0.98, dta_text, transform=ax_dta.transAxes, fontsize=9,
-                           verticalalignment='top', bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8))
         
         ax_dta.set_title(f'Distance to Agreement (DTA) Map (Threshold: {suppression_level}%)')
         ax_dta.set_xlabel('Position (mm)')
         ax_dta.set_ylabel('Position (mm)')
 
-    plt.tight_layout(rect=(0, 0, 1, 0.96))
-    plt.savefig(output_path, format='jpeg')
+    plt.tight_layout(rect=(0, 0, 1, 0.96), pad=2.0, w_pad=2.5, h_pad=2.5)
+    plt.savefig(output_path, format='jpeg', dpi=150)
     plt.close(fig)
