@@ -54,12 +54,22 @@ def generate_report(
     fig = plt.figure(figsize=(20, 12))
     gs = fig.add_gridspec(3, 4, height_ratios=[0.5, 1, 1], width_ratios=[1, 1, 1, 1.2])
 
-    # Patient Info Header
+    # Patient Info Header - Three-line format
     institution, patient_id, patient_name = dicom_handler.get_patient_info()
     title_ax = fig.add_subplot(gs[0, :])
     title_ax.axis('off')
-    title_ax.text(0.5, 0.5, f'Institution: {institution} | Patient: {patient_name} ({patient_id})',
-                 ha='center', va='center', fontsize=22, weight='bold')
+
+    # Line 1: Main title
+    title_ax.text(0.5, 0.85, '2D Gamma Report',
+                 ha='center', va='top', fontsize=22, weight='bold')
+
+    # Line 2: Patient info
+    title_ax.text(0.5, 0.50, f'Patient: {patient_id} / {patient_name}',
+                 ha='center', va='center', fontsize=18, weight='bold')
+
+    # Line 3: Institution
+    title_ax.text(0.5, 0.15, f'Institution: {institution}',
+                 ha='center', va='bottom', fontsize=16)
 
     # 1. 2D Dose Plots
     # DICOM Dose
@@ -68,7 +78,7 @@ def generate_report(
     dicom_extent = dicom_handler.get_physical_extent()
     if dicom_data is not None and dicom_extent is not None:
         im_dicom = ax_dicom.imshow(dicom_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='upper')
-        cbar_dicom = fig.colorbar(im_dicom, ax=ax_dicom, label='Dose (Gy)', orientation='horizontal', pad=0.1)
+        cbar_dicom = fig.colorbar(im_dicom, ax=ax_dicom, label='Dose (Gy)', orientation='vertical', pad=0.02)
     ax_dicom.set_title('DICOM RT Dose', fontsize=12, weight='bold')
     ax_dicom.set_xlabel('Position (mm)', fontsize=10)
     ax_dicom.set_ylabel('Position (mm)', fontsize=10)
@@ -78,7 +88,7 @@ def generate_report(
     # mcc_interp_data is on the (cropped) DICOM grid
     if mcc_interp_data is not None and dicom_extent is not None:
         im_mcc = ax_mcc.imshow(mcc_interp_data, cmap='jet', extent=dicom_extent, aspect='equal', origin='upper')
-        cbar_mcc = fig.colorbar(im_mcc, ax=ax_mcc, label='Dose (Gy)', orientation='horizontal', pad=0.1)
+        cbar_mcc = fig.colorbar(im_mcc, ax=ax_mcc, label='Dose (Gy)', orientation='vertical', pad=0.02)
 
     ax_mcc.set_title('MCC Dose (Interpolated)', fontsize=12, weight='bold')
     ax_mcc.set_xlabel('Position (mm)', fontsize=10)
@@ -122,82 +132,84 @@ def generate_report(
     mcc_extent = mcc_handler.get_physical_extent()
     if gamma_map is not None and mcc_extent is not None:
         im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
-        cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='horizontal', pad=0.1)
-    
+        cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='vertical', pad=0.02)
+
     ax_gamma.set_title(f'Gamma Analysis (DTA: {dta}mm, DD: {dd}%)', fontsize=12, weight='bold')
     ax_gamma.set_xlabel('Position (mm)', fontsize=10)
     ax_gamma.set_ylabel('Position (mm)', fontsize=10)
 
-    # Results Panel
+    # Results Panel - Two-column layout
     ax_results = fig.add_subplot(gs[1, 3])
     ax_results.axis('off')
-    
+
     pass_rate = gamma_stats.get('pass_rate', 0)
     total_points = gamma_stats.get('total_points', 0)
     passed_points = int(total_points * pass_rate / 100)
     failed_points = total_points - passed_points
 
-    # Create comprehensive results text
-    results_text = (
-        f"╔═══ Gamma Analysis ═══╗\n\n"
+    # Left Panel: Gamma Analysis
+    gamma_text = (
+        f"╔═ Gamma Analysis ═╗\n\n"
         f"Acceptance Criteria:\n"
         f"  • DTA: {dta} mm\n"
-        f"  • Dose Diff: {dd} %\n"
-        f"  • Threshold: {suppression_level} %\n\n"
-        f"Analysis Results:\n"
-        f"  ► Pass Rate: {pass_rate:.2f} %\n"
-        f"  • Analyzed: {total_points:,}\n"
-        f"  • Passed: {passed_points:,}\n"
-        f"  • Failed: {failed_points:,}\n"
+        f"  • DD: {dd} %\n"
+        f"  • Threshold: {suppression_level}%\n\n"
+        f"Results:\n"
+        f"  ► Pass Rate:\n"
+        f"    {pass_rate:.2f} %\n"
+        f"  • Analyzed:\n"
+        f"    {total_points:,}\n"
+        f"  • Passed:\n"
+        f"    {passed_points:,}\n"
+        f"  • Failed:\n"
+        f"    {failed_points:,}\n"
     )
-    
-    dd_text = ""
-    if dd_stats:
-        dd_text = (
-            f"\n───────────────────────\n"
-            f"DD Analysis (%):\n"
-            f"  • Mean: {dd_stats.get('mean', 0):>7.2f}\n"
-            f"  • Max:  {dd_stats.get('max', 0):>7.2f}\n"
-            f"  • Min:  {dd_stats.get('min', 0):>7.2f}\n"
-            f"  • Std:  {dd_stats.get('std', 0):>7.2f}\n"
-        )
-    
-    dta_text = ""
-    if dta_stats:
-        dta_text = (
-            f"\n───────────────────────\n"
-            f"DTA Analysis (mm):\n"
-            f"  • Mean: {dta_stats.get('mean', 0):>7.2f}\n"
-            f"  • Max:  {dta_stats.get('max', 0):>7.2f}\n"
-            f"  • Min:  {dta_stats.get('min', 0):>7.2f}\n"
-            f"  • Std:  {dta_stats.get('std', 0):>7.2f}\n"
-        )
-    
-    stats_text = results_text + dd_text + dta_text
-    ax_results.text(0.05, 0.95, stats_text, transform=ax_results.transAxes, fontsize=11,
+
+    ax_results.text(0.02, 0.98, gamma_text, transform=ax_results.transAxes, fontsize=10,
                    verticalalignment='top', family='monospace',
-                   bbox=dict(boxstyle='round,pad=0.7', fc='aliceblue', alpha=0.85,
+                   bbox=dict(boxstyle='round,pad=0.6', fc='aliceblue', alpha=0.85,
                             edgecolor='steelblue', linewidth=1.5))
 
-    # Add emphasized Pass Rate display at the bottom
-    pass_color = 'green' if pass_rate >= 95 else 'orange' if pass_rate >= 90 else 'red'
-    pass_text = f"PASS RATE\n{pass_rate:.1f}%"
-    ax_results.text(0.5, 0.08, pass_text, transform=ax_results.transAxes,
-                   fontsize=18, weight='bold', ha='center', va='center',
-                   color=pass_color,
-                   bbox=dict(boxstyle='round,pad=0.5', fc='white', alpha=0.9,
-                            edgecolor=pass_color, linewidth=2.5))
+    # Right Panel: DD & DTA Analysis
+    dd_dta_text = ""
+    if dd_stats:
+        dd_dta_text += (
+            f"╔═══ DD Analysis ═══╗\n\n"
+            f"Dose Difference (%):\n"
+            f"  • Mean: {dd_stats.get('mean', 0):>6.2f}\n"
+            f"  • Max:  {dd_stats.get('max', 0):>6.2f}\n"
+            f"  • Min:  {dd_stats.get('min', 0):>6.2f}\n"
+            f"  • Std:  {dd_stats.get('std', 0):>6.2f}\n"
+        )
+
+    if dta_stats:
+        if dd_dta_text:
+            dd_dta_text += "\n\n"
+        dd_dta_text += (
+            f"╔══ DTA Analysis ═══╗\n\n"
+            f"Distance to Agreement (mm):\n"
+            f"  • Mean: {dta_stats.get('mean', 0):>6.2f}\n"
+            f"  • Max:  {dta_stats.get('max', 0):>6.2f}\n"
+            f"  • Min:  {dta_stats.get('min', 0):>6.2f}\n"
+            f"  • Std:  {dta_stats.get('std', 0):>6.2f}\n"
+        )
+
+    if dd_dta_text:
+        ax_results.text(0.52, 0.98, dd_dta_text, transform=ax_results.transAxes, fontsize=10,
+                       verticalalignment='top', family='monospace',
+                       bbox=dict(boxstyle='round,pad=0.6', fc='lightyellow', alpha=0.85,
+                                edgecolor='orange', linewidth=1.5))
 
     # 4. DD and DTA Analysis (4th row)
     if dd_map is not None and dta_map is not None:
         mcc_extent = mcc_handler.get_physical_extent()
-        
+
         # DD Map (Dose Difference)
         ax_dd = fig.add_subplot(gs[2, 2])
         if mcc_extent is not None:
             im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
-            cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='horizontal', pad=0.1)
-        
+            cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='vertical', pad=0.02)
+
         ax_dd.set_title(f'Dose Difference (DD) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
         ax_dd.set_xlabel('Position (mm)', fontsize=10)
         ax_dd.set_ylabel('Position (mm)', fontsize=10)
@@ -206,8 +218,8 @@ def generate_report(
         ax_dta = fig.add_subplot(gs[2, 3])
         if mcc_extent is not None:
             im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
-            cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='horizontal', pad=0.1)
-        
+            cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='vertical', pad=0.02)
+
         ax_dta.set_title(f'Distance to Agreement (DTA) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
         ax_dta.set_xlabel('Position (mm)', fontsize=10)
         ax_dta.set_ylabel('Position (mm)', fontsize=10)
