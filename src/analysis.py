@@ -114,9 +114,9 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
                 profile_data['dicom_at_mcc'] = dicom_at_mcc_positions
 
         return profile_data
-        
+
     except Exception as e:
-        logger.error(f"프로파일 데이터 추출 오류: {str(e)}", exc_info=True)
+        logger.error(f"Error extracting profile data: {str(e)}", exc_info=True)
         return profile_data
 
 def perform_gamma_analysis(reference_handler, evaluation_handler,
@@ -229,44 +229,44 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         dta_values = np.full(len(points_ref), np.inf)
         
         logger.info(f"Starting manual gamma calculation for {len(points_ref)} reference points...")
-        
-        # 각 기준(MCC) 포인트에 대해 감마 계산
+
+        # Calculate gamma for each reference (MCC) point
         for i, (point_ref, dose_ref) in enumerate(zip(points_ref, doses_ref)):
             # Dose difference criteria (global or local normalization)
             if global_normalisation:
                 dd_criteria_sq = (dose_percent_threshold / 100.0 * norm_dose) ** 2
             else:
                 dd_criteria_sq = (dose_percent_threshold / 100.0 * dose_ref) ** 2
-            
-            # 1. 거리 계산: 현재 기준점과 모든 DICOM 픽셀 간의 거리
-            # 최적화: DTA 내의 점들만 고려
-            search_radius = distance_mm_threshold * 2  # 탐색 반경 (DTA의 2배 정도)
-            
-            # DICOM 좌표에서 탐색 영역 필터링
+
+            # 1. Distance calculation: between current reference point and all DICOM pixels
+            # Optimization: only consider points within DTA threshold
+            search_radius = distance_mm_threshold * 2  # Search radius (approximately 2x DTA)
+
+            # Filter search area from DICOM coordinates
             min_x, max_x = point_ref[0] - search_radius, point_ref[0] + search_radius
             min_y, max_y = point_ref[1] - search_radius, point_ref[1] + search_radius
-            
+
             x_indices = np.where((phys_x_dicom >= min_x) & (phys_x_dicom <= max_x))[0]
             y_indices = np.where((phys_y_dicom >= min_y) & (phys_y_dicom <= max_y))[0]
 
             if x_indices.size == 0 or y_indices.size == 0:
                 continue
 
-            # 탐색 영역 내의 DICOM 좌표와 선량 값
+            # DICOM coordinates and dose values within search area
             eval_coords_y, eval_coords_x = np.meshgrid(phys_y_dicom[y_indices], phys_x_dicom[x_indices], indexing='ij')
             points_eval = np.vstack((eval_coords_x.ravel(), eval_coords_y.ravel())).T
             doses_eval = dicom_dose_grid[np.ix_(y_indices, x_indices)].ravel()
-            
-            # 2. 선량 차이 계산
+
+            # 2. Calculate dose difference
             dose_diff_sq = (doses_eval - dose_ref) ** 2
-            
-            # 3. 거리 차이 계산
+
+            # 3. Calculate distance difference
             dist_sq = np.sum((points_eval - point_ref)**2, axis=1)
 
-            # 4. 감마 계산
+            # 4. Calculate gamma
             gamma_sq = (dist_sq / dta_criteria_sq) + (dose_diff_sq / dd_criteria_sq)
-            
-            # 5. 최소 감마 값 및 해당 지점의 dd, dta 저장
+
+            # 5. Store minimum gamma value and corresponding dd, dta at that point
             min_idx = np.argmin(gamma_sq)
             min_gamma = np.sqrt(gamma_sq[min_idx])
             gamma_values[i] = min_gamma

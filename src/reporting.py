@@ -91,21 +91,7 @@ def generate_report(
             ax_hor_profile.plot(hor_profile_data['phys_coords'], hor_profile_data['mcc_interp'], 'r--', linewidth=2, label='mcc dose (y=0)')
         if 'mcc_values' in hor_profile_data and 'mcc_phys_coords' in hor_profile_data:
             ax_hor_profile.plot(hor_profile_data['mcc_phys_coords'], hor_profile_data['mcc_values'], 'ro', markersize=8)
-            
-        # # Add shifted profiles if available
-        # if additional_profiles:
-        #     if 'hor_plus1' in additional_profiles and additional_profiles['hor_plus1']:
-        #         data = additional_profiles['hor_plus1']
-        #         ax_hor_profile.plot(data['phys_coords'], data['dicom_values'], 'b:', alpha=0.7, label='RT dose (y=+1cm)')
-        #         if 'mcc_interp' in data:
-        #             ax_hor_profile.plot(data['phys_coords'], data['mcc_interp'], 'r:', alpha=0.7, label='mcc dose (y=+1cm)')
-            
-        #     if 'hor_minus1' in additional_profiles and additional_profiles['hor_minus1']:
-        #         data = additional_profiles['hor_minus1']
-        #         ax_hor_profile.plot(data['phys_coords'], data['dicom_values'], 'b-.', alpha=0.7, label='RT dose (y=-1cm)')
-        #         if 'mcc_interp' in data:
-        #             ax_hor_profile.plot(data['phys_coords'], data['mcc_interp'], 'r-.', alpha=0.7, label='mcc dose (y=-1cm)')
-        
+
         ax_hor_profile.set_xlabel('Position (mm)')
         ax_hor_profile.set_ylabel('Dose (Gy)')
         ax_hor_profile.set_title('Left-Right Profile (Horizontal)')
@@ -120,21 +106,7 @@ def generate_report(
             ax_ver_profile.plot(ver_profile_data['phys_coords'], ver_profile_data['mcc_interp'], 'r--', linewidth=2, label='mcc dose (x=0)')
         if 'mcc_values' in ver_profile_data and 'mcc_phys_coords' in ver_profile_data:
             ax_ver_profile.plot(ver_profile_data['mcc_phys_coords'], ver_profile_data['mcc_values'], 'ro', markersize=8)
-            
-        # # Add shifted profiles if available
-        # if additional_profiles:
-        #     if 'ver_plus1' in additional_profiles and additional_profiles['ver_plus1']:
-        #         data = additional_profiles['ver_plus1']
-        #         ax_ver_profile.plot(data['phys_coords'], data['dicom_values'], 'b:', alpha=0.7, label='RT dose (x=+1cm)')
-        #         if 'mcc_interp' in data:
-        #             ax_ver_profile.plot(data['phys_coords'], data['mcc_interp'], 'r:', alpha=0.7, label='mcc dose (x=+1cm)')
-            
-        #     if 'ver_minus1' in additional_profiles and additional_profiles['ver_minus1']:
-        #         data = additional_profiles['ver_minus1']
-        #         ax_ver_profile.plot(data['phys_coords'], data['dicom_values'], 'b-.', alpha=0.7, label='RT dose (x=-1cm)')
-        #         if 'mcc_interp' in data:
-        #             ax_ver_profile.plot(data['phys_coords'], data['mcc_interp'], 'r-.', alpha=0.7, label='mcc dose (x=-1cm)')
-                    
+
         ax_ver_profile.set_xlabel('Position (mm)')
         ax_ver_profile.set_ylabel('Dose (Gy)')
         ax_ver_profile.set_title('In-Out Profile (Vertical)')
@@ -146,8 +118,7 @@ def generate_report(
     ax_gamma = fig.add_subplot(gs[2, 0])
     mcc_extent = mcc_handler.get_physical_extent()
     if gamma_map is not None and mcc_extent is not None:
-        # Flip gamma_map vertically and use origin='lower' to align with other dose distributions
-        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='lower')
+        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
         fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index')
     ax_gamma.set_title(f'Gamma Analysis (Pass: {gamma_stats.get("pass_rate", 0):.1f}%)')
     ax_gamma.set_xlabel('Position (mm)')
@@ -207,16 +178,16 @@ def generate_report(
         # DD Map (Dose Difference)
         ax_dd = fig.add_subplot(gs[3, 0])
         if mcc_extent is not None:
-            im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='lower')
+            im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
             fig.colorbar(im_dd, ax=ax_dd, label='DD')
         ax_dd.set_title(f'Dose Difference (DD) Map')
         ax_dd.set_xlabel('Position (mm)')
         ax_dd.set_ylabel('Position (mm)')
-        
+
         # DTA Map (Distance to Agreement)
         ax_dta = fig.add_subplot(gs[3, 1])
         if mcc_extent is not None:
-            im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='lower')
+            im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
             fig.colorbar(im_dta, ax=ax_dta, label='DTA')
         ax_dta.set_title(f'Distance to Agreement (DTA) Map')
         ax_dta.set_xlabel('Position (mm)')
