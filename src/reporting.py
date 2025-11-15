@@ -137,7 +137,7 @@ def generate_report(
     ax_gamma = fig.add_subplot(gs[1, 2])
     if gamma_map_interp is not None and dicom_extent is not None:
         # Use interpolated gamma map on DICOM grid (no gaps)
-        im_gamma = ax_gamma.imshow(gamma_map_interp, cmap='coolwarm', extent=dicom_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
+        im_gamma = ax_gamma.imshow(gamma_map_interp, cmap='coolwarm', extent=dicom_extent, vmin=0, vmax=2, aspect='equal', origin='upper', interpolation='bilinear')
         cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='vertical', pad=0.02)
     elif gamma_map is not None:
         # Fallback to sparse gamma map on MCC grid
@@ -163,7 +163,7 @@ def generate_report(
     gamma_text = (
         f"═ Criteria ═\n"
         f" •DTA: {dta} mm\n"
-        f" •DD: {dd} %\n"
+        f" •DD: {dd}%\n"
         f" •Threshold: {suppression_level}%"
     )
 
@@ -174,15 +174,14 @@ def generate_report(
     
     # Left Panel: Gamma Analysis
     gamma_text = (
-        f"═ γ Analysis ═\n"
-        f"Results:\n"
-        f" ►Result:{pass_rate:.2f} %\n"
+        f"═ γ Analysis ═\n\n"
+        f" ►Result:{pass_rate:.2f}%\n\n"
         f" •Analyzed: {total_points:,}\n"
         f"  •Passed: {passed_points:,}\n"
         f"  •Failed: {failed_points:,}"
     )
 
-    ax_results.text(0.02, 0.6, gamma_text, transform=ax_results.transAxes, fontsize=12,
+    ax_results.text(0.02, 0.4, gamma_text, transform=ax_results.transAxes, fontsize=13,
                    verticalalignment='top', family='monospace',
                    bbox=dict(boxstyle='round,pad=0.6', fc='lightyellow', alpha=0.85,
                              edgecolor='orange', linewidth=1.5))
@@ -221,7 +220,7 @@ def generate_report(
         ax_dd = fig.add_subplot(gs[2, 2])
         if dd_map_interp is not None and dicom_extent is not None:
             # Use interpolated DD map on DICOM grid (no gaps)
-            im_dd = ax_dd.imshow(dd_map_interp, cmap='viridis', extent=dicom_extent, aspect='equal', origin='upper')
+            im_dd = ax_dd.imshow(dd_map_interp, cmap='viridis', extent=dicom_extent, aspect='equal', origin='upper', interpolation='bilinear')
             cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='vertical', pad=0.02)
         elif dd_map is not None:
             # Fallback to sparse DD map on MCC grid
@@ -239,7 +238,7 @@ def generate_report(
         ax_dta = fig.add_subplot(gs[2, 3])
         if dta_map_interp is not None and dicom_extent is not None:
             # Use interpolated DTA map on DICOM grid (no gaps)
-            im_dta = ax_dta.imshow(dta_map_interp, cmap='plasma', extent=dicom_extent, aspect='equal', origin='upper')
+            im_dta = ax_dta.imshow(dta_map_interp, cmap='plasma', extent=dicom_extent, aspect='equal', origin='upper', interpolation='bilinear')
             cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='vertical', pad=0.02)
         elif dta_map is not None:
             # Fallback to sparse DTA map on MCC grid

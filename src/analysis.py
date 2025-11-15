@@ -5,8 +5,10 @@ including profile extraction and gamma analysis.
 """
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
 from src.utils import logger, find_nearest_index, save_map_to_csv
 import os
+import yaml
 
 def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=None):
     """
@@ -30,6 +32,7 @@ def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=N
     
     try:
         # Define axis-dependent variables based on direction
+        sort_required = False  # Initialize with default value
         if direction == "vertical":
             # Vertical profile: x is fixed, y is the profile axis
             fixed_axis_coords_dicom = dicom_handler.phys_x_mesh[0, :]
@@ -350,32 +353,72 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
         # Extract physical coordinates of analyzed points for interpolation
         analyzed_coords_phys = points_ref  # These are the physical coordinates of analyzed points
 
-        # Interpolate gamma map to DICOM grid
+        # Load interpolation settings from config
+        try:
+            with open("config.yaml", "r") as f:
+                config = yaml.safe_load(f)
+            interpolation_method = config.get("interpolation_method", "cubic")
+            smoothing_factor = config.get("smoothing_factor", 1.0)
+            fill_value_type = config.get("fill_value_type", "zero")  # "zero" or "nan"
+        except:
+            interpolation_method = "cubic"
+            smoothing_factor = 1.0
+            fill_value_type = "zero"
+
+        # Set fill value based on config
+        fill_value = 0 if fill_value_type == "zero" else np.nan
+
+        # Interpolate gamma map to DICOM grid with improved method
         gamma_map_interp = griddata(
             analyzed_coords_phys,
             gamma_values,
             (dicom_phys_x_mesh, dicom_phys_y_mesh),
-            method='linear',
-            fill_value=np.nan
+            method=interpolation_method,
+            fill_value=fill_value
         )
 
-        # Interpolate DD map to DICOM grid
+        # Apply smoothing if specified
+        if smoothing_factor > 0 and fill_value_type == "zero":
+            # Only smooth non-zero values to preserve the background
+            mask = gamma_map_interp != 0
+            if np.any(mask):
+                smoothed_gamma = np.zeros_like(gamma_map_interp)
+                smoothed_gamma[mask] = gaussian_filter(gamma_map_interp[mask], sigma=smoothing_factor)
+                gamma_map_interp = smoothed_gamma
+
+        # Interpolate DD map to DICOM grid with improved method
         dd_map_interp = griddata(
             analyzed_coords_phys,
             dd_values,
             (dicom_phys_x_mesh, dicom_phys_y_mesh),
-            method='linear',
-            fill_value=np.nan
+            method=interpolation_method,
+            fill_value=fill_value
         )
 
-        # Interpolate DTA map to DICOM grid
+        # Apply smoothing if specified
+        if smoothing_factor > 0 and fill_value_type == "zero":
+            mask = dd_map_interp != 0
+            if np.any(mask):
+                smoothed_dd = np.zeros_like(dd_map_interp)
+                smoothed_dd[mask] = gaussian_filter(dd_map_interp[mask], sigma=smoothing_factor)
+                dd_map_interp = smoothed_dd
+
+        # Interpolate DTA map to DICOM grid with improved method
         dta_map_interp = griddata(
             analyzed_coords_phys,
             dta_values,
             (dicom_phys_x_mesh, dicom_phys_y_mesh),
-            method='linear',
-            fill_value=np.nan
+            method=interpolation_method,
+            fill_value=fill_value
         )
+
+        # Apply smoothing if specified
+        if smoothing_factor > 0 and fill_value_type == "zero":
+            mask = dta_map_interp != 0
+            if np.any(mask):
+                smoothed_dta = np.zeros_like(dta_map_interp)
+                smoothed_dta[mask] = gaussian_filter(dta_map_interp[mask], sigma=smoothing_factor)
+                dta_map_interp = smoothed_dta
 
         # --- Step 6: Save maps to CSV ---
         if save_csv and csv_dir:
