@@ -83,7 +83,8 @@ def main():
 
     # Perform gamma analysis
     try:
-        gamma_map, gamma_stats, phys_extent, mcc_interp_data, dd_map, dta_map, dd_stats, dta_stats = perform_gamma_analysis(
+        (gamma_map, gamma_stats, phys_extent, mcc_interp_data, dd_map, dta_map, dd_stats, dta_stats,
+         gamma_map_interp, dd_map_interp, dta_map_interp) = perform_gamma_analysis(
             mcc_handler, dicom_handler,
             dd, dta,
             global_normalisation=True,
@@ -167,7 +168,10 @@ def main():
                     'ver_minus1': ver_profile_data_minus1,
                     'hor_plus1': hor_profile_data_plus1,
                     'hor_minus1': hor_profile_data_minus1
-                }
+                },
+                gamma_map_interp=gamma_map_interp,
+                dd_map_interp=dd_map_interp,
+                dta_map_interp=dta_map_interp
             )
             logger.info(f"Report saved to {output_filename}")
 
