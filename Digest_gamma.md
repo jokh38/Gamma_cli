@@ -182,9 +182,9 @@ Class for handling MCC files.
 
 ---
 
-## 3. `src/main.py`
+## 3. `main.py`
 
-This module contains the main function for running the gamma analysis from the command line.
+This module contains the main function for running the gamma analysis from the command line. Located in the root directory, it serves as the entry point for the application.
 
 ### Functions
 
