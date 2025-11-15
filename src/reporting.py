@@ -58,7 +58,7 @@ def generate_report(
         dta_map_interp (np.ndarray, optional): Interpolated DTA map (on DICOM grid). Defaults to None.
     """
     fig = plt.figure(figsize=(20, 12))
-    gs = fig.add_gridspec(3, 4, height_ratios=[0.5, 1, 1], width_ratios=[1, 1, 1, 1.2])
+    gs = fig.add_gridspec(3, 4, height_ratios=[0.5, 1, 1], width_ratios=[1, 1, 1, 1])
 
     # Patient Info Header - Three-line format
     institution, patient_id, patient_name = dicom_handler.get_patient_info()
@@ -146,7 +146,7 @@ def generate_report(
             im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
             cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='vertical', pad=0.02)
 
-    ax_gamma.set_title(f'Gamma Analysis (DTA: {dta}mm, DD: {dd}%)', fontsize=12, weight='bold')
+    ax_gamma.set_title(f'Gamma Analysis', fontsize=12, weight='bold')
     ax_gamma.set_xlabel('Position (mm)', fontsize=10)
     ax_gamma.set_ylabel('Position (mm)', fontsize=10)
 
@@ -159,58 +159,61 @@ def generate_report(
     passed_points = int(total_points * pass_rate / 100)
     failed_points = total_points - passed_points
 
-    # Left Panel: Gamma Analysis
+    # Left Panel: Gamma criteria
     gamma_text = (
-        f"╔═ Gamma Analysis ═╗\n\n"
-        f"Acceptance Criteria:\n"
-        f"  • DTA: {dta} mm\n"
-        f"  • DD: {dd} %\n"
-        f"  • Threshold: {suppression_level}%\n\n"
-        f"Results:\n"
-        f"  ► Pass Rate:\n"
-        f"    {pass_rate:.2f} %\n"
-        f"  • Analyzed:\n"
-        f"    {total_points:,}\n"
-        f"  • Passed:\n"
-        f"    {passed_points:,}\n"
-        f"  • Failed:\n"
-        f"    {failed_points:,}\n"
+        f"═ Criteria ═\n"
+        f" •DTA: {dta} mm\n"
+        f" •DD: {dd} %\n"
+        f" •Threshold: {suppression_level}%"
     )
 
     ax_results.text(0.02, 0.98, gamma_text, transform=ax_results.transAxes, fontsize=10,
                    verticalalignment='top', family='monospace',
                    bbox=dict(boxstyle='round,pad=0.6', fc='aliceblue', alpha=0.85,
                             edgecolor='steelblue', linewidth=1.5))
+    
+    # Left Panel: Gamma Analysis
+    gamma_text = (
+        f"═ γ Analysis ═\n"
+        f"Results:\n"
+        f" ►Result:{pass_rate:.2f} %\n"
+        f" •Analyzed: {total_points:,}\n"
+        f"  •Passed: {passed_points:,}\n"
+        f"  •Failed: {failed_points:,}"
+    )
+
+    ax_results.text(0.02, 0.6, gamma_text, transform=ax_results.transAxes, fontsize=12,
+                   verticalalignment='top', family='monospace',
+                   bbox=dict(boxstyle='round,pad=0.6', fc='lightyellow', alpha=0.85,
+                             edgecolor='orange', linewidth=1.5))
 
     # Right Panel: DD & DTA Analysis
     dd_dta_text = ""
     if dd_stats:
         dd_dta_text += (
-            f"╔═══ DD Analysis ═══╗\n\n"
-            f"Dose Difference (%):\n"
-            f"  • Mean: {dd_stats.get('mean', 0):>6.2f}\n"
-            f"  • Max:  {dd_stats.get('max', 0):>6.2f}\n"
-            f"  • Min:  {dd_stats.get('min', 0):>6.2f}\n"
-            f"  • Std:  {dd_stats.get('std', 0):>6.2f}\n"
+            f"═ DD Analysis(%) ═\n"
+            f" •Mean: {dd_stats.get('mean', 0):>6.2f}\n"
+            f" •Max : {dd_stats.get('max', 0):>6.2f}\n"
+            f" •Min : {dd_stats.get('min', 0):>6.2f}\n"
+            f" •Std : {dd_stats.get('std', 0):>6.2f}\n"
         )
 
     if dta_stats:
         if dd_dta_text:
-            dd_dta_text += "\n\n"
+            dd_dta_text += "\n"
         dd_dta_text += (
-            f"╔══ DTA Analysis ═══╗\n\n"
-            f"Distance to Agreement (mm):\n"
-            f"  • Mean: {dta_stats.get('mean', 0):>6.2f}\n"
-            f"  • Max:  {dta_stats.get('max', 0):>6.2f}\n"
-            f"  • Min:  {dta_stats.get('min', 0):>6.2f}\n"
-            f"  • Std:  {dta_stats.get('std', 0):>6.2f}\n"
+            f"═ DTA Analysis(mm) ═\n"
+            f" •Mean: {dta_stats.get('mean', 0):>6.2f}\n"
+            f" •Max : {dta_stats.get('max', 0):>6.2f}\n"
+            f" •Min : {dta_stats.get('min', 0):>6.2f}\n"
+            f" •Std : {dta_stats.get('std', 0):>6.2f}"
         )
 
     if dd_dta_text:
         ax_results.text(0.52, 0.98, dd_dta_text, transform=ax_results.transAxes, fontsize=10,
                        verticalalignment='top', family='monospace',
-                       bbox=dict(boxstyle='round,pad=0.6', fc='lightyellow', alpha=0.85,
-                                edgecolor='orange', linewidth=1.5))
+                       bbox=dict(boxstyle='round,pad=0.6', fc='aliceblue', alpha=0.85,
+                                 edgecolor='steelblue', linewidth=1.5))
 
     # 4. DD and DTA Analysis - Use interpolated versions if available for gap-free visualization
     if dd_map_interp is not None or dd_map is not None:
@@ -227,7 +230,7 @@ def generate_report(
                 im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
                 cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='vertical', pad=0.02)
 
-        ax_dd.set_title(f'Dose Difference (DD) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
+        ax_dd.set_title(f'Dose Difference (DD) Map', fontsize=12, weight='bold')
         ax_dd.set_xlabel('Position (mm)', fontsize=10)
         ax_dd.set_ylabel('Position (mm)', fontsize=10)
 
@@ -245,7 +248,7 @@ def generate_report(
                 im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
                 cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='vertical', pad=0.02)
 
-        ax_dta.set_title(f'Distance to Agreement (DTA) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
+        ax_dta.set_title(f'Distance to Agreement (DTA) Map', fontsize=12, weight='bold')
         ax_dta.set_xlabel('Position (mm)', fontsize=10)
         ax_dta.set_ylabel('Position (mm)', fontsize=10)
 

@@ -5,7 +5,7 @@ including profile extraction and gamma analysis.
 """
 import numpy as np
 from scipy.interpolate import griddata
-from utils import logger, find_nearest_index, save_map_to_csv
+from src.utils import logger, find_nearest_index, save_map_to_csv
 import os
 
 def extract_profile_data(direction, fixed_position, dicom_handler, mcc_handler=None):

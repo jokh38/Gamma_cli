@@ -8,9 +8,7 @@ import sys
 import csv
 import pydicom
 from scipy.interpolate import griddata
-from utils import logger
-
-
+from src.utils import logger
 
 class BaseFileHandler:
     """Base class for various file handlers."""
