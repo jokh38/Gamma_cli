@@ -22,8 +22,11 @@ class TestGammaAnalysis(unittest.TestCase):
         self.dicom_handler = DicomFileHandler()
         self.mcc_handler = MCCFileHandler()
 
-        self.assertTrue(self.dicom_handler.open_file(self.dicom_path))
-        self.assertTrue(self.mcc_handler.open_file(self.mcc_path))
+        dicom_success, dicom_error = self.dicom_handler.open_file(self.dicom_path)
+        self.assertTrue(dicom_success, f"Failed to load DICOM file: {dicom_error}")
+
+        mcc_success, mcc_error = self.mcc_handler.open_file(self.mcc_path)
+        self.assertTrue(mcc_success, f"Failed to load MCC file: {mcc_error}")
 
     def test_perform_gamma_analysis(self):
         """
