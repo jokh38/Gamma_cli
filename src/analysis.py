@@ -139,14 +139,17 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
 
     Returns:
         tuple: A tuple containing:
-            - gamma_map (np.ndarray): The gamma map.
+            - gamma_map (np.ndarray): The gamma map (sparse, on MCC grid).
             - gamma_stats (dict): Statistics of the gamma analysis.
             - phys_extent (list): The physical extent of the analysis.
             - mcc_interp_data (np.ndarray): Interpolated MCC data for visualization.
-            - dd_map (np.ndarray): The dose difference map.
-            - dta_map (np.ndarray): The distance-to-agreement map.
+            - dd_map (np.ndarray): The dose difference map (sparse, on MCC grid).
+            - dta_map (np.ndarray): The distance-to-agreement map (sparse, on MCC grid).
             - dd_stats (dict): Statistics of the dose difference analysis.
             - dta_stats (dict): Statistics of the distance-to-agreement analysis.
+            - gamma_map_interp (np.ndarray): Interpolated gamma map (on DICOM grid).
+            - dd_map_interp (np.ndarray): Interpolated DD map (on DICOM grid).
+            - dta_map_interp (np.ndarray): Interpolated DTA map (on DICOM grid).
     """
     try:
         # --- Step 1: Extract and filter reference data (MCC) ---
@@ -209,7 +212,13 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
             dta_map_empty = np.full_like(mcc_dose_data, np.nan)
             dd_stats_empty = {'mean': 0, 'max': 0, 'min': 0, 'std': 0, 'total_points': 0}
             dta_stats_empty = {'mean': 0, 'max': 0, 'min': 0, 'std': 0, 'total_points': 0}
-            return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data, dd_map_empty, dta_map_empty, dd_stats_empty, dta_stats_empty
+
+            # Return empty interpolated maps as well
+            gamma_map_interp_empty = np.full(dicom_dose_grid.shape, np.nan)
+            dd_map_interp_empty = np.full(dicom_dose_grid.shape, np.nan)
+            dta_map_interp_empty = np.full(dicom_dose_grid.shape, np.nan)
+
+            return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data, dd_map_empty, dta_map_empty, dd_stats_empty, dta_stats_empty, gamma_map_interp_empty, dd_map_interp_empty, dta_map_interp_empty
 
         # These are the points that will be used in the gamma calculation
         mcc_dose_for_gamma = all_mcc_dose_values[analysis_mask]
@@ -337,6 +346,37 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
             fill_value=0
         )
 
+        # --- Step 5b: Create interpolated gamma, DD, and DTA maps for visualization ---
+        # Extract physical coordinates of analyzed points for interpolation
+        analyzed_coords_phys = points_ref  # These are the physical coordinates of analyzed points
+
+        # Interpolate gamma map to DICOM grid
+        gamma_map_interp = griddata(
+            analyzed_coords_phys,
+            gamma_values,
+            (dicom_phys_x_mesh, dicom_phys_y_mesh),
+            method='linear',
+            fill_value=np.nan
+        )
+
+        # Interpolate DD map to DICOM grid
+        dd_map_interp = griddata(
+            analyzed_coords_phys,
+            dd_values,
+            (dicom_phys_x_mesh, dicom_phys_y_mesh),
+            method='linear',
+            fill_value=np.nan
+        )
+
+        # Interpolate DTA map to DICOM grid
+        dta_map_interp = griddata(
+            analyzed_coords_phys,
+            dta_values,
+            (dicom_phys_x_mesh, dicom_phys_y_mesh),
+            method='linear',
+            fill_value=np.nan
+        )
+
         # --- Step 6: Save maps to CSV ---
         if save_csv and csv_dir:
             try:
@@ -354,7 +394,7 @@ def perform_gamma_analysis(reference_handler, evaluation_handler,
             except Exception as e:
                 logger.error(f"Failed to save analysis maps to CSV: {e}", exc_info=True)
 
-        return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data, dd_map_for_display, dta_map_for_display, dd_stats, dta_stats
+        return gamma_map_for_display, gamma_stats, phys_extent, mcc_interp_data, dd_map_for_display, dta_map_for_display, dd_stats, dta_stats, gamma_map_interp, dd_map_interp, dta_map_interp
 
     except Exception as e:
         logger.error(f"Error during manual gamma analysis: {str(e)}")

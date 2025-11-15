@@ -21,7 +21,10 @@ def generate_report(
     dta_map=None,
     dd_stats=None,
     dta_stats=None,
-    additional_profiles=None
+    additional_profiles=None,
+    gamma_map_interp=None,
+    dd_map_interp=None,
+    dta_map_interp=None
 ):
     """
     Generates a comprehensive PDF report of the gamma analysis results.
@@ -37,7 +40,7 @@ def generate_report(
         output_path (str): The path to save the generated report file.
         dicom_handler (DicomFileHandler): The handler for the DICOM data.
         mcc_handler (MCCFileHandler): The handler for the MCC data.
-        gamma_map (np.ndarray): The calculated gamma map.
+        gamma_map (np.ndarray): The calculated gamma map (sparse, on MCC grid).
         gamma_stats (dict): A dictionary of statistics for the gamma analysis.
         dta (float): The Distance-to-Agreement criterion used (in mm).
         dd (float): The Dose Difference criterion used (in %).
@@ -45,11 +48,14 @@ def generate_report(
         ver_profile_data (dict): Data for the vertical dose profile.
         hor_profile_data (dict): Data for the horizontal dose profile.
         mcc_interp_data (np.ndarray, optional): Interpolated MCC data. Defaults to None.
-        dd_map (np.ndarray, optional): The dose difference map. Defaults to None.
-        dta_map (np.ndarray, optional): The distance-to-agreement map. Defaults to None.
+        dd_map (np.ndarray, optional): The dose difference map (sparse). Defaults to None.
+        dta_map (np.ndarray, optional): The distance-to-agreement map (sparse). Defaults to None.
         dd_stats (dict, optional): Statistics for the dose difference analysis. Defaults to None.
         dta_stats (dict, optional): Statistics for the distance-to-agreement analysis. Defaults to None.
         additional_profiles (dict, optional): Data for additional dose profiles. Defaults to None.
+        gamma_map_interp (np.ndarray, optional): Interpolated gamma map (on DICOM grid). Defaults to None.
+        dd_map_interp (np.ndarray, optional): Interpolated DD map (on DICOM grid). Defaults to None.
+        dta_map_interp (np.ndarray, optional): Interpolated DTA map (on DICOM grid). Defaults to None.
     """
     fig = plt.figure(figsize=(20, 12))
     gs = fig.add_gridspec(3, 4, height_ratios=[0.5, 1, 1], width_ratios=[1, 1, 1, 1.2])
@@ -127,12 +133,18 @@ def generate_report(
         ax_ver_profile.grid(True)
 
     # 3. Gamma Analysis
-    # Gamma Map
+    # Gamma Map - Use interpolated version if available for gap-free visualization
     ax_gamma = fig.add_subplot(gs[1, 2])
-    mcc_extent = mcc_handler.get_physical_extent()
-    if gamma_map is not None and mcc_extent is not None:
-        im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
+    if gamma_map_interp is not None and dicom_extent is not None:
+        # Use interpolated gamma map on DICOM grid (no gaps)
+        im_gamma = ax_gamma.imshow(gamma_map_interp, cmap='coolwarm', extent=dicom_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
         cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='vertical', pad=0.02)
+    elif gamma_map is not None:
+        # Fallback to sparse gamma map on MCC grid
+        mcc_extent = mcc_handler.get_physical_extent()
+        if mcc_extent is not None:
+            im_gamma = ax_gamma.imshow(gamma_map, cmap='coolwarm', extent=mcc_extent, vmin=0, vmax=2, aspect='equal', origin='upper')
+            cbar_gamma = fig.colorbar(im_gamma, ax=ax_gamma, label='Gamma Index', orientation='vertical', pad=0.02)
 
     ax_gamma.set_title(f'Gamma Analysis (DTA: {dta}mm, DD: {dd}%)', fontsize=12, weight='bold')
     ax_gamma.set_xlabel('Position (mm)', fontsize=10)
@@ -200,25 +212,38 @@ def generate_report(
                        bbox=dict(boxstyle='round,pad=0.6', fc='lightyellow', alpha=0.85,
                                 edgecolor='orange', linewidth=1.5))
 
-    # 4. DD and DTA Analysis (4th row)
-    if dd_map is not None and dta_map is not None:
-        mcc_extent = mcc_handler.get_physical_extent()
-
+    # 4. DD and DTA Analysis - Use interpolated versions if available for gap-free visualization
+    if dd_map_interp is not None or dd_map is not None:
         # DD Map (Dose Difference)
         ax_dd = fig.add_subplot(gs[2, 2])
-        if mcc_extent is not None:
-            im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
+        if dd_map_interp is not None and dicom_extent is not None:
+            # Use interpolated DD map on DICOM grid (no gaps)
+            im_dd = ax_dd.imshow(dd_map_interp, cmap='viridis', extent=dicom_extent, aspect='equal', origin='upper')
             cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='vertical', pad=0.02)
+        elif dd_map is not None:
+            # Fallback to sparse DD map on MCC grid
+            mcc_extent = mcc_handler.get_physical_extent()
+            if mcc_extent is not None:
+                im_dd = ax_dd.imshow(dd_map, cmap='viridis', extent=mcc_extent, aspect='equal', origin='upper')
+                cbar_dd = fig.colorbar(im_dd, ax=ax_dd, label='DD (%)', orientation='vertical', pad=0.02)
 
         ax_dd.set_title(f'Dose Difference (DD) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
         ax_dd.set_xlabel('Position (mm)', fontsize=10)
         ax_dd.set_ylabel('Position (mm)', fontsize=10)
 
+    if dta_map_interp is not None or dta_map is not None:
         # DTA Map (Distance to Agreement)
         ax_dta = fig.add_subplot(gs[2, 3])
-        if mcc_extent is not None:
-            im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
+        if dta_map_interp is not None and dicom_extent is not None:
+            # Use interpolated DTA map on DICOM grid (no gaps)
+            im_dta = ax_dta.imshow(dta_map_interp, cmap='plasma', extent=dicom_extent, aspect='equal', origin='upper')
             cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='vertical', pad=0.02)
+        elif dta_map is not None:
+            # Fallback to sparse DTA map on MCC grid
+            mcc_extent = mcc_handler.get_physical_extent()
+            if mcc_extent is not None:
+                im_dta = ax_dta.imshow(dta_map, cmap='plasma', extent=mcc_extent, aspect='equal', origin='upper')
+                cbar_dta = fig.colorbar(im_dta, ax=ax_dta, label='DTA (mm)', orientation='vertical', pad=0.02)
 
         ax_dta.set_title(f'Distance to Agreement (DTA) Map (Threshold: {suppression_level}%)', fontsize=12, weight='bold')
         ax_dta.set_xlabel('Position (mm)', fontsize=10)
