@@ -19,7 +19,8 @@ pip install -r requirements.txt
 
 ## File Structure
 
-- `src/main.py`: Main command-line application entry point.
+- `main.py`: Main command-line application entry point (located in the root directory).
+- `config.yaml`: Configuration file for analysis parameters (located in the root directory).
 - `src/file_handlers.py`: Classes for handling DICOM and MCC files.
 - `src/analysis.py`: Profile extraction and gamma analysis functions.
 - `src/reporting.py`: Functions for generating image reports.
@@ -44,7 +45,7 @@ csv_export_path: "csv_exports"
 
 ## Usage
 
-To run the analysis, use the `src/main.py` script with the following arguments:
+To run the analysis, use the `main.py` script from the root directory with the following arguments:
 
 - `--rtplan`: Path to the DICOM RT plan file.
 - `--measure`: Path to the measurement data file (MCC).
@@ -54,8 +55,8 @@ To run the analysis, use the `src/main.py` script with the following arguments:
 The repository includes sample data in the `data/` directory.
 
 ```bash
-python src/main.py --rtplan data/1G240_2cm.dcm --measure data/1G240_2cm.mcc
-python src/main.py --rtplan data/104659/RD.1G.dcm --measure data/104659/1G_020mm.mcc
+python main.py --rtplan data/1G240_2cm.dcm --measure data/1G240_2cm.mcc
+python main.py --rtplan data/104659/RD.1G.dcm --measure data/104659/1G_020mm.mcc
 ```
 
 The tool will print the gamma analysis results to the console and save a report image in the `reports/` directory.
